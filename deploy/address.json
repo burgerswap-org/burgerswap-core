@@ -1,0 +1,30 @@
+[
+    {
+        "weth": "0x6DB985312069742DF3F4ebbA2d133A1d541eC882",
+        "block": 1481
+    },
+    {
+        "factory": "0x286e3aEB5254fc7a61f00e83b66CE7Fa3B9Cac58",
+        "block": 1482
+    },
+    {
+        "platform": "0xed3d24c3D9aaC0BaB7a9082E23f9722FE51a02D6",
+        "block": 1483
+    },
+    {
+        "dgas": "0xeeC73049119B41b905acE184D638725B39Ca796D",
+        "block": 1484
+    },
+    {
+        "governance": "0xBf1fc7257Dbd825a1937132FC6e9Baeb356cf681",
+        "block": 1485
+    },
+    {
+        "config": "0x4262De85216adF95450c3DAa9C226761d555a085",
+        "block": 1486
+    },
+    {
+        "ballotFactory": "0x9e55F2B5Fc769D29E01B34292d8fEE601518C8a3",
+        "block": 1487
+    }
+]

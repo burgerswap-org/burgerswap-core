@@ -1,0 +1,56 @@
+{
+  "name": "@demax/demax-core",
+  "description": "Core contracts for the Demax protocol",
+  "version": "1.0.1",
+  "homepage": "",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "keywords": [
+    "demax",
+    "ethereum",
+    "v2",
+    "core"
+  ],
+  "files": [
+    "contracts",
+    "build"
+  ],
+  "engines": {
+    "node": ">=10"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.2.6",
+    "@types/mocha": "^5.2.7",
+    "chai": "^4.2.0",
+    "ethereum-waffle": "2.5.1",
+    "ethereumjs-util": "^7.0.3",
+    "mocha": "^8.1.0",
+    "prettier": "^1.19.1",
+    "rimraf": "^3.0.0",
+    "solc": "0.6.6",
+    "ts-node": "^8.10.2",
+    "typescript": "^3.9.7"
+  },
+  "scripts": {
+    "lint": "yarn prettier ./test/*.ts --check",
+    "lint:fix": "yarn prettier ./test/*.ts --write",
+    "clean": "rimraf ./build/",
+    "precompile": "yarn clean",
+    "compile": "waffle .waffle.json",
+    "pretest": "yarn compile",
+    "test": "mocha --timeout 600000",
+    "flatten": "waffle flatten .waffle.json",
+    "deploy": "waffle .waffle.json && node ./deploy/deploy.js",
+    "test1": "mocha --timeout 600000 --no-config --require ts-node/register",
+    "prepublishOnly": "yarn test"
+  },
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "@nomiclabs/buidler": "^1.4.3",
+    "@nomiclabs/buidler-ethers": "^2.0.0",
+    "@nomiclabs/buidler-waffle": "^2.0.0",
+    "ethers": "4.0.47"
+  }
+}
