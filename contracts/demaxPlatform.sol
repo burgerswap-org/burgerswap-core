@@ -21,6 +21,9 @@ contract DemaxPlatform is Ownable {
     address public GOVERNANCE;
     address public TRANSFER_LISTENER;
     uint256 public constant PERCENT_DENOMINATOR = 10000;
+
+    bool public isPause;
+
     event AddLiquidity(
         address indexed player,
         address indexed tokenA,
@@ -66,6 +69,14 @@ contract DemaxPlatform is Ownable {
         WETH = _WETH;
         GOVERNANCE = _GOVERNANCE;
         TRANSFER_LISTENER = _TRANSFER_LISTENER;
+    }
+
+    function pause() external onlyOwner {
+        isPause = true;
+    }
+
+    function resume() external onlyOwner {
+        isPause = false;
     }
 
     function _addLiquidity(
@@ -137,6 +148,7 @@ contract DemaxPlatform is Ownable {
             uint256 _liquidity
         )
     {
+        require(!isPause, "DEMAX PAUSED");
         (_amountA, _amountB) = _addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin);
         address pair = DemaxSwapLibrary.pairFor(FACTORY, tokenA, tokenB);
         TransferHelper.safeTransferFrom(tokenA, msg.sender, pair, _amountA);
@@ -163,6 +175,7 @@ contract DemaxPlatform is Ownable {
             uint256 liquidity
         )
     {
+        require(!isPause, "DEMAX PAUSED");
         (amountToken, amountETH) = _addLiquidity(
             token,
             WETH,
@@ -191,6 +204,7 @@ contract DemaxPlatform is Ownable {
         address to,
         uint256 deadline
     ) public ensure(deadline) returns (uint256 amountA, uint256 amountB) {
+        require(!isPause, "DEMAX PAUSED");
         address pair = DemaxSwapLibrary.pairFor(FACTORY, tokenA, tokenB);
         uint256 _liquidity = liquidity;
         address _tokenA = tokenA;
@@ -213,6 +227,7 @@ contract DemaxPlatform is Ownable {
         address to,
         uint256 deadline
     ) public ensure(deadline) returns (uint256 amountToken, uint256 amountETH) {
+        require(!isPause, "DEMAX PAUSED");
         (amountToken, amountETH) = removeLiquidity(
             token,
             WETH,
@@ -227,7 +242,6 @@ contract DemaxPlatform is Ownable {
         TransferHelper.safeTransferETH(to, amountETH);
         _transferNotify(address(this), to, token, amountToken);
         _transferNotify(address(this), to, WETH, amountETH);
-        emit RemoveLiquidity(msg.sender, token, WETH, amountToken, amountETH);
     }
 
     function _getAmountsOut(
@@ -287,6 +301,7 @@ contract DemaxPlatform is Ownable {
         address[] memory path,
         address _to
     ) internal {
+        require(!isPause, "DEMAX PAUSED");
         require(swapPrecondition(path[path.length - 1]), 'DEMAX PLATFORM : CHECK DGAS/TOKEN TO VALUE FAIL');
         for (uint256 i; i < path.length - 1; i++) {
             (address input, address output) = (path[i], path[i + 1]);
@@ -346,6 +361,7 @@ contract DemaxPlatform is Ownable {
         address to,
         uint256 deadline
     ) external ensure(deadline) returns (uint256[] memory amounts) {
+
         uint256 percent = _getSwapFeePercent();
         amounts = _getAmountsOut(amountIn, path, percent);
         require(amounts[amounts.length - 1] >= amountOutMin, 'DEMAX PLATFORM : INSUFFICIENT_OUTPUT_AMOUNT');
@@ -552,5 +568,23 @@ contract DemaxPlatform is Ownable {
     function getAmountsIn(uint256 amountOut, address[] memory path) public view returns (uint256[] memory amounts) {
         uint256 percent = _getSwapFeePercent();
         return _getAmountsIn(amountOut, path, percent);
+    }
+
+    function migrateLiquidity(address pair, address tokenA, address tokenB, address[] calldata users) external onlyOwner {
+        if (IDemaxFactory(FACTORY).getPair(tokenA, tokenB) == address(0)) {
+            IDemaxFactory(FACTORY).createPair(tokenA, tokenB);
+        }
+        address newPair = IDemaxFactory(FACTORY).getPair(tokenA, tokenB);
+        for(uint i = 0; i < users.length; i++) {
+            uint liquidity = IDemaxPair(pair).balanceOf(users[i]);
+            if(liquidity > 0) {
+                IDemaxPair(pair).burn(users[i], newPair, liquidity);
+                IDemaxPair(newPair).mint(users[i]);
+                IDemaxFactory(FACTORY).addPlayerPair(users[i], newPair);
+            }
+        }
+
+        IDemaxTransferListener(TRANSFER_LISTENER).upgradeProdutivity(pair, newPair);
+        
     }
 }

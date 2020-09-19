@@ -30,6 +30,13 @@ contract DemaxGovernance is DgasStaking, Ownable {
 
     address[] public ballots;
 
+    struct FeeRule {
+        uint governace;
+        uint burn;
+    }
+
+    FeeRule public feeRule;
+
     event ConfigAudited(bytes32 name, address indexed ballot, uint proposal);
     event ConfigBallotCreated(address indexed proposer, bytes32 name, uint value, address indexed ballotAddr, uint reward);
     event TokenBallotCreated(address indexed proposer, address indexed token, uint value, address indexed ballotAddr, uint reward);
@@ -40,6 +47,8 @@ contract DemaxGovernance is DgasStaking, Ownable {
     event TokenAudited(address user, address token, uint status, bool result);
     event RewardCollected(address indexed user, address indexed ballot, uint value);
     event RewardReceived(address indexed user, uint value);
+    event FeeRuleChanged(uint governace, uint burn);
+    event FeeAllocated(address indexed ballot, uint governace, uint burn);
 
     modifier onlyRewarder() {
         require(msg.sender == rewardAddr, 'DemaxGovernance: ONLY_REWARDER');
@@ -59,6 +68,16 @@ contract DemaxGovernance is DgasStaking, Ownable {
         lockTime = getConfigValue(ConfigNames.UNSTAKE_DURATION);
     }
 
+    function setFeeRule(uint _governace, uint _burn) external onlyOwner {
+        _changeFeeRule(_governace, _burn);
+    }
+
+    function _changeFeeRule(uint _governace, uint _burn) internal {
+        feeRule.governace = _governace;
+        feeRule.burn = _burn;
+        emit FeeRuleChanged(_governace, _burn);
+    }
+
     function audit(address _ballot) external returns (bool) {
         if(ballotTypes[_ballot] == T_CONFIG) {
             return auditConfig(_ballot);
@@ -72,10 +91,15 @@ contract DemaxGovernance is DgasStaking, Ownable {
     }
 
     function auditConfig(address _ballot) public returns (bool) {
-        bool result = IDemaxBallot(_ballot).end();
-        require(result, 'DemaxGovernance: NO_PASS');
-        uint value = IDemaxBallot(_ballot).value();
         bytes32 name = configBallots[_ballot];
+        uint value = IDemaxBallot(_ballot).value();
+        uint configValue = IDemaxConfig(configAddr).getConfigValue(name);
+        bool result = IDemaxBallot(_ballot).end();
+        if(value == configValue) {
+            return result;
+        }
+        require(result, 'DemaxGovernance: NO_PASS');
+
         result = IDemaxConfig(configAddr).changeConfigValue(name, value);
         if (name == ConfigNames.UNSTAKE_DURATION) {
             lockTime = value;
@@ -274,10 +298,25 @@ contract DemaxGovernance is DgasStaking, Ownable {
 
     function _createdBallot(address _ballot, uint _type) internal returns (uint) {
         uint reward = rewardOf[rewardAddr];
-        ballotOf[_ballot] = reward;
-        _rewardTransfer(rewardAddr, _ballot, reward);
+        uint feeDenominator = feeRule.governace.add(feeRule.burn);
+        uint governaceAmount;
+        uint burnAmount;
+
+        if (feeRule.burn > 0) {
+            burnAmount = reward.mul(feeRule.burn).div(feeDenominator);
+            _rewardTransfer(rewardAddr, address(0), burnAmount);
+            TransferHelper.safeTransfer(baseToken, address(0), burnAmount);
+        }
+
+        governaceAmount = reward.sub(burnAmount);
+        if (governaceAmount > 0) {
+            _rewardTransfer(rewardAddr, _ballot, governaceAmount);
+        }
+
+        ballotOf[_ballot] = governaceAmount;
         ballots.push(_ballot);
         ballotTypes[_ballot] = _type;
+        // emit FeeAllocated(_ballot, governaceAmount, burnAmount);
         return reward;
     }
 

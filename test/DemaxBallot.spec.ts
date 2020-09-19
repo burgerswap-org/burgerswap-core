@@ -38,12 +38,13 @@ describe('DemaxBallot', () => {
   let token: Contract
   let demaxBallot: Contract
   let expectValue = 1
-  let endBlockNumber = 11
+  let endBlockNumber = 12
   before(async () => {
     const balance = await wallet.getBalance();
     log.debug('wallet:', wallet.address, ' balance:', expandToString(balance))
     token = await deployContract(wallet, ERC20, [expandTo18Decimals(100), 'TT', 'Token Test'], overrides)
-    demaxBallot = await deployContract(wallet, DemaxBallot, [wallet.address, expectValue, endBlockNumber, token.address, "subject", "content"], overrides)
+    demaxBallot = await deployContract(wallet, DemaxBallot, [], overrides)
+    await demaxBallot.initialize(wallet.address, expectValue, endBlockNumber, token.address, "subject", "content")
     log.info('token:', token.address)
     log.info('demaxBallot:', demaxBallot.address)
     await getBlockNumber();
@@ -70,6 +71,12 @@ describe('DemaxBallot', () => {
     log.debug('user4 balance:', expandToString(balance))
   }
   describe('#tests', () => {
+
+    it('init:fail', async () => {
+      await getBlockNumber()
+      await expect(demaxBallot.connect(user4).initialize(wallet.address, expectValue, endBlockNumber, token.address, "subject", "content")).to.be.revertedWith('DemaxBallot: FORBIDDEN')
+    })
+
     it('end:fail', async () => {
       await expect(demaxBallot.end()).to.be.revertedWith('DemaxBallot: FORBIDDEN')
       await expect(token.end(demaxBallot.address)).to.be.revertedWith('ballot not yet ended')

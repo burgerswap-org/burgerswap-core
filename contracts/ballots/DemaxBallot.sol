@@ -33,6 +33,7 @@ contract DemaxBallot {
 
     uint public total;
     uint public createTime;
+    address public factory;
 
     modifier onlyGovernor() {
         require(msg.sender == governor, 'DemaxBallot: FORBIDDEN');
@@ -42,16 +43,21 @@ contract DemaxBallot {
     /**
      * @dev Create a new ballot.
      */
-    constructor(address _proposer, uint _value, uint _endBlockNumber, address _governor, string memory _subject, string memory _content) public {
+    constructor() public {
+        factory = msg.sender;
+        proposals[YES] = 0;
+        proposals[NO] = 0;
+        createTime = block.timestamp;
+    }
+
+    function initialize(address _proposer, uint _value, uint _endBlockNumber, address _governor, string memory _subject, string memory _content) public {
+        require(msg.sender == factory, 'DemaxBallot: FORBIDDEN');
         proposer = _proposer;
         value = _value;
         endBlockNumber = _endBlockNumber;
         governor = _governor;
         subject = _subject;
         content = _content;
-        proposals[YES] = 0;
-        proposals[NO] = 0;
-        createTime = block.timestamp;
     }
 
     /**

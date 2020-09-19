@@ -180,14 +180,11 @@ describe('DemaxGovernance', () => {
       let receipt = await tx.wait()
       log.debug('listToken gas:', receipt.gasUsed.toString())
       // log.debug('events:', receipt.events)
-      log.debug('proposer:', receipt.events[4].args.proposer)
-      log.debug('token:', receipt.events[4].args.token)
-      log.debug('ballotAddr:', receipt.events[4].args.ballotAddr)
-      log.debug('reward:', expandToString(receipt.events[4].args.reward))
-      log.debug('amount:', expandToString(receipt.events[5].args.amount))
-      expect(receipt.events[5].args.amount).to.eq(expandTo18Decimals(10))
+      log.debug('events[3].args:', receipt.events[3].args)
+      log.debug('events[4].args:', receipt.events[4].args)
+      expect(receipt.events[4].args.amount).to.eq(expandTo18Decimals(10))
       
-      let ballotContract = new Contract(receipt.events[4].args.ballotAddr, JSON.stringify(DemaxBallot.abi), provider).connect(wallet)
+      let ballotContract = new Contract(receipt.events[3].args.ballotAddr, JSON.stringify(DemaxBallot.abi), provider).connect(wallet)
       let value = await ballotContract.subject()
       log.debug('subject:', value)
       expect(value).to.eq('subject')
@@ -680,12 +677,14 @@ describe('DemaxGovernance', () => {
       tx = await demaxGovernance.audit(ballotContract.address)
       receipt = await tx.wait()
       log.debug('auditConfig gas:', receipt.gasUsed.toString())
-      log.debug(receipt.events[1].event, 'args:', receipt.events[1].args)
-      expect(receipt.events[1].args.ballot).to.eq(ballotContract.address)
-      expect(receipt.events[1].args.proposal).to.eq(expectValue)
+      log.debug('auditConfig event:', receipt.events)
 
       let value = await demaxConfig.getConfigValue(formatBytes32String('LIST_DGAS_AMOUNT'))
       log.debug('LIST_DGAS_AMOUNT: value:', expandToString(value))
+      expect(value).to.eq(expectValue)
+
+      value = await ballotContract.ended()
+      expect(value).to.eq(true)
 
       let reward = await demaxGovernance.getReward(ballotContract.address)
       log.debug('wallet reward:', reward.toString())
@@ -694,7 +693,6 @@ describe('DemaxGovernance', () => {
       let reward2 = await demaxGovernance.connect(user2).getReward(ballotContract.address)
       log.debug('user2 reward:', reward2.toString())
 
-      
       tx = await demaxGovernance.collectReward(ballotContract.address)
       receipt = await tx.wait()
       expect(reward).to.eq(receipt.events[0].args.value)

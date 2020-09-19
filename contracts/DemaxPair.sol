@@ -273,13 +273,6 @@ contract DemaxPair is BaseShareField {
         emit MintDGAS(msg.sender, remainReward, userReward);
     }
 
-    function skim(address to) external lock {
-        address _token0 = token0;
-        address _token1 = token1;
-        _safeTransfer(_token0, to, _balanceOf(_token0, address(this)).sub(reserve0));
-        _safeTransfer(_token1, to, _balanceOf(_token0, address(this)).sub(reserve1));
-    }
-
     function getDGASReserve() public view returns (uint256) {
         return _balanceOf(DGAS, address(this));
     }

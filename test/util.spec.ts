@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { BigNumber, bigNumberify } from 'ethers/utils'
+import { BigNumber, bigNumberify, parseEther } from 'ethers/utils'
 import { expandTo18Decimals, expandToString, newBigNumber } from './shared/utilities'
 
 describe('Util', () => {
@@ -8,12 +8,17 @@ describe('Util', () => {
   })
 
   it('temp', async () => {
-    let bn = newBigNumber('1000000000000000000000')
+    let bn = newBigNumber('100000000000000000000')
     console.log(expandToString(bn), bn.toString())
     bn = newBigNumber('100000000000000000000000000')
     console.log(expandToString(bn), bn.toString())
+    bn = newBigNumber('3000000000000000000000000')
+    console.log(expandToString(bn), bn.toString())
+    bn = newBigNumber('0xb760252385a37fb500')
+    console.log(expandToString(bn), bn.toString())
     console.log('1U:', expandTo18Decimals(1, 6).toString())
     console.log('1ETH:', expandTo18Decimals(1).toString())
+    console.log('0.05ETH:', parseEther('0.05').toString())
   })
 
   it('decrease', async () => {

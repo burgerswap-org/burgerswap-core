@@ -8,6 +8,7 @@ contract DemaxFactory {
     uint256 public version = 1;
     address public DGAS;
     address public CONFIG;
+    address public owner;
     mapping(address => mapping(address => address)) public getPair;
     mapping(address => bool) public isPair;
     address[] public allPairs;
@@ -21,6 +22,15 @@ contract DemaxFactory {
     constructor(address _DGAS, address _CONFIG) public {
         DGAS = _DGAS;
         CONFIG = _CONFIG;
+        owner = msg.sender;
+    }
+
+    function updateConfig(address _CONFIG) external {
+        require(msg.sender == owner, 'DEMAX FACTORY: PERMISSION');
+        CONFIG = _CONFIG;
+        for(uint i = 0; i < allPairs.length; i ++) {
+            DemaxPair(allPairs[i]).initialize(DemaxPair(allPairs[i]).token0(), DemaxPair(allPairs[i]).token1(), _CONFIG, DGAS);
+        }
     }
 
     function getPlayerPairCount(address player) external view returns (uint256) {
@@ -43,6 +53,7 @@ contract DemaxFactory {
     }
 
     function createPair(address tokenA, address tokenB) external returns (address pair) {
+        require(msg.sender == IDemaxConfig(CONFIG).platform(), 'DEMAX FACTORY: PERMISSION');
         require(tokenA != tokenB, 'DEMAX FACTORY: IDENTICAL_ADDRESSES');
         require(
             IDemaxConfig(CONFIG).checkToken(tokenA) && IDemaxConfig(CONFIG).checkToken(tokenB),

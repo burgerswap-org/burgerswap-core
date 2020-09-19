@@ -60,6 +60,7 @@ interface IDemaxGovernance {
     function balanceOf(address owner) external view returns (uint);
     function allowance(address owner) external view returns (uint);
     function configBallots(address ballot) external view returns (bytes32);
+    function stakingSupply() external view returns (uint);
     function collectUsers(address ballot, address user) external view returns(uint);
 }
 
@@ -74,6 +75,7 @@ interface IDemaxBallot {
     function content() external view returns(string memory);
     function endBlockNumber() external view returns(uint);
     function createTime() external view returns(uint);
+    function proposer() external view returns(address);
     function proposals(uint index) external view returns(uint);
     function ended() external view returns (bool);
     function value() external view returns (uint);
@@ -105,6 +107,7 @@ contract DemaxQuery {
     address public governance;
     
     struct Proposal {
+        address proposer;
         address ballotAddress;
         address tokenAddress;
         string subject;
@@ -123,6 +126,7 @@ contract DemaxQuery {
         bool audited;
         uint value;
         bytes32 key;
+        uint currentValue;
     }
     
     struct Token {
@@ -133,6 +137,7 @@ contract DemaxQuery {
         uint allowance;
         uint allowanceGov;
         uint status;
+        uint totalSupply;
     }
     
     struct Liquidity {
@@ -171,6 +176,7 @@ contract DemaxQuery {
                 tk.allowance = IERC20(tk.tokenAddress).allowance(msg.sender, platform);
                 tk.allowanceGov = IERC20(tk.tokenAddress).allowance(msg.sender, governance);
                 tk.status = IDemaxConfig(configAddr).tokenStatus(tk.tokenAddress);
+                tk.totalSupply = IERC20(tk.tokenAddress).totalSupply();
                 token_list[i] = tk;
             }
         }
@@ -225,12 +231,14 @@ contract DemaxQuery {
         }
     }
     
-    function queryConfig() public view returns (uint fee_percent, uint proposal_amount, uint unstake_duration, uint remove_duration, uint list_token_amount){
+    function queryConfig() public view returns (uint fee_percent, uint proposal_amount, uint unstake_duration, 
+    uint remove_duration, uint list_token_amount, uint vote_percent){
         fee_percent = IDemaxConfig(configAddr).getConfigValue(SWAP_FEE_PERCENT);
         proposal_amount = IDemaxConfig(configAddr).getConfigValue(PROPOSAL_DGAS_AMOUNT);
         unstake_duration = IDemaxConfig(configAddr).getConfigValue(UNSTAKE_DURATION);
         remove_duration = IDemaxConfig(configAddr).getConfigValue(REMOVE_LIQUIDITY_DURATION);
         list_token_amount = IDemaxConfig(configAddr).getConfigValue(LIST_DGAS_AMOUNT);
+        vote_percent = IDemaxConfig(configAddr).getConfigValue(VOTE_REWARD_PERCENT);
     }
     
     function queryCondition(address[] memory path_list) public view returns (uint){
@@ -245,6 +253,7 @@ contract DemaxQuery {
     }
     
     function generateProposal(address ballot_address) public view returns (Proposal memory proposal){
+        proposal.proposer = IDemaxBallot(ballot_address).proposer();
         proposal.subject = IDemaxBallot(ballot_address).subject();
         proposal.content = IDemaxBallot(ballot_address).content();
         proposal.createTime = IDemaxBallot(ballot_address).createTime();
@@ -264,6 +273,7 @@ contract DemaxQuery {
         proposal.value = IDemaxBallot(ballot_address).value();
         if(proposal.ballotType == 1) {
             proposal.key = IDemaxGovernance(governance).configBallots(ballot_address);
+            proposal.currentValue = IDemaxConfig(governance).getConfigValue(proposal.key);
         }
     }
     
@@ -288,8 +298,9 @@ contract DemaxQuery {
         config_item = IDemaxConfig(configAddr).configs(name);
     }
     
-    function queryStakeInfo() public view returns (uint stake_amount, uint stake_block) {
+    function queryStakeInfo() public view returns (uint stake_amount, uint stake_block, uint total_stake) {
         stake_amount = IDemaxGovernance(governance).balanceOf(msg.sender);
         stake_block = IDemaxGovernance(governance).allowance(msg.sender);
+        total_stake = IDemaxGovernance(governance).stakingSupply();
     }
 }

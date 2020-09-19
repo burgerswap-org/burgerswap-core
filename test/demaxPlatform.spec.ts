@@ -109,6 +109,8 @@ async function makeContractAndInitialize() {
   ])
   await DGAS.upgradeImpl(TRANSFER_LISTENER.address)
 
+  await TRANSFER_LISTENER.setWhitelist(true, [DGAS.address, WETH.address, TOKEN_A.address, TOKEN_B.address, TOKEN_USDT.address])
+
   log.debug('initialize end')
 }
 async function getListBallotContractAddress(tx: any) {
@@ -161,7 +163,7 @@ async function listTokens(address: string) {
   // staking
   await DGAS.approve(GOVERNANCE.address, expandTo18Decimals(1000))
   await GOVERNANCE.deposit(expandTo18Decimals(1000))
-  const contract = await new ethers.Contract(ballotAddress, ballot.abi, provider).connect(wallet)
+  const contract = new Contract(ballotAddress, ballot.abi, provider).connect(wallet)
   // // exe vote
   await contract.vote(1)
   // // comfirm vote result
@@ -243,6 +245,7 @@ describe('demax platform', async () => {
     await DGAS.approve(PLATFORM.address, expandTo18Decimals(100))
     let approveAmount: BigNumber = await DGAS.allowance(wallet.address, PLATFORM.address)
     expect(approveAmount.toString()).to.eq(expandTo18Decimals(100))
+    await sleep(1000)
     let tx = await PLATFORM.addLiquidityETH(
       DGAS.address,
       expandTo18Decimals(100),
@@ -264,11 +267,12 @@ describe('demax platform', async () => {
     let getLiqudity = await pairContract.balanceOf(wallet.address)
     log.debug('getLiqudity 2:', expandToString(getLiqudity), getLiqudity.toString())
     expect(getLiqudity.toString()).to.eq('31622776601683792319')
-
+    await sleep(1000)
     log.debug((await DGAS.balanceOf(wallet.address)).toString())
     await DGAS.approve(PLATFORM.address, expandTo18Decimals(100))
     approveAmount = await DGAS.allowance(wallet.address, PLATFORM.address)
     expect(approveAmount.toString()).to.eq(expandTo18Decimals(100))
+    await sleep(1000)
     tx = await PLATFORM.addLiquidityETH(
       DGAS.address,
       expandTo18Decimals(100),
@@ -294,9 +298,11 @@ describe('demax platform', async () => {
   })
 
   it('add tokenA/dags liqudity', async () => {
+    await sleep(1000)
     await DGAS.approve(PLATFORM.address, expandTo18Decimals(10000))
     let approveAmount: BigNumber = await DGAS.allowance(wallet.address, PLATFORM.address)
     expect(approveAmount.toString()).to.eq(expandTo18Decimals(10000))
+    await sleep(1000)
     let tx = await PLATFORM.addLiquidityETH(
       DGAS.address,
       expandTo18Decimals(10000),
@@ -307,6 +313,7 @@ describe('demax platform', async () => {
         value: expandTo18Decimals(10)
       }
     )
+    await sleep(1000)
     await TOKEN_A.approve(PLATFORM.address, expandTo18Decimals(10000))
     approveAmount = await TOKEN_A.allowance(wallet.address, PLATFORM.address)
     expect(approveAmount.toString()).to.eq(expandTo18Decimals(10000))
@@ -315,6 +322,7 @@ describe('demax platform', async () => {
     approveAmount = await DGAS.allowance(wallet.address, PLATFORM.address)
     expect(approveAmount.toString()).to.eq(expandTo18Decimals(100))
     log.debug('balance of wallet dgas', (await DGAS.balanceOf(wallet.address)).toString())
+    await sleep(1000)
     tx = await PLATFORM.addLiquidity(
       TOKEN_A.address,
       DGAS.address,
@@ -335,9 +343,11 @@ describe('demax platform', async () => {
     let getLiqudity = await pairContract.balanceOf(wallets[0].address)
     log.debug('getLiqudity 1:', expandToString(getLiqudity), getLiqudity.toString())
     expect(getLiqudity.toString()).to.eq('999999999999999999000')
-    await sleep(500)
+    await sleep(1000)
     await DGAS.approve(PLATFORM.address, expandTo18Decimals(100))
+    await sleep(1000)
     await TOKEN_A.approve(PLATFORM.address, expandTo18Decimals(10000))
+    await sleep(1000)
     tx = await PLATFORM.addLiquidity(
       TOKEN_A.address,
       DGAS.address,
@@ -788,4 +798,5 @@ describe('removeLiqulity on duration', async () => {
     )
     await tx.wait()
   })
+
 })
