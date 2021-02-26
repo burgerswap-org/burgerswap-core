@@ -40,8 +40,17 @@ interface IDemaxPlatform {
 }
 
 interface IDemaxFactory {
+    function getPair(address tokenA, address tokenB) external view returns(address);
+}
+
+interface IDemaxDelegate {
     function getPlayerPairCount(address player) external view returns(uint);
     function playerPairs(address user, uint index) external view returns(address);
+}
+
+interface IDemaxLP {
+    function tokenA() external view returns (address);
+    function tokenB() external view returns (address);
 }
 
 interface IDemaxPair {
@@ -89,7 +98,7 @@ interface IDemaxTransferListener {
 
 pragma experimental ABIEncoderV2;
 
-contract DemaxQuery {
+contract DemaxQuery2 {
     bytes32 public constant PRODUCE_DGAS_RATE = bytes32('PRODUCE_DGAS_RATE');
     bytes32 public constant SWAP_FEE_PERCENT = bytes32('SWAP_FEE_PERCENT');
     bytes32 public constant LIST_DGAS_AMOUNT = bytes32('LIST_DGAS_AMOUNT');
@@ -111,6 +120,7 @@ contract DemaxQuery {
     address public owner;
     address public governance;
     address public transferListener;
+    address public delegate;
     
     struct Proposal {
         address proposer;
@@ -148,6 +158,7 @@ contract DemaxQuery {
     
     struct Liquidity {
         address pair;
+        address lp;
         uint balance;
         uint totalSupply;
         uint lastBlock;
@@ -157,13 +168,14 @@ contract DemaxQuery {
         owner = msg.sender;
     }
     
-    function upgrade(address _config, address _platform, address _factory, address _governance, address _transferListener) public {
+    function upgrade(address _config, address _platform, address _factory, address _governance, address _transferListener, address _delegate) public {
         require(owner == msg.sender);
         configAddr = _config;
         platform = _platform;
         factory = _factory;
         governance = _governance;
         transferListener = _transferListener;
+        delegate = _delegate;
     }
    
     function queryTokenList() public view returns (Token[] memory token_list) {
@@ -176,7 +188,7 @@ contract DemaxQuery {
                 tk.symbol = IERC20(tk.tokenAddress).symbol();
                 tk.decimal = IERC20(tk.tokenAddress).decimals();
                 tk.balance = IERC20(tk.tokenAddress).balanceOf(msg.sender);
-                tk.allowance = IERC20(tk.tokenAddress).allowance(msg.sender, platform);
+                tk.allowance = IERC20(tk.tokenAddress).allowance(msg.sender, delegate);
                 tk.allowanceGov = IERC20(tk.tokenAddress).allowance(msg.sender, governance);
                 tk.status = IDemaxConfig(configAddr).tokenStatus(tk.tokenAddress);
                 tk.totalSupply = IERC20(tk.tokenAddress).totalSupply();
@@ -203,7 +215,7 @@ contract DemaxQuery {
                 tk.symbol = IERC20(tk.tokenAddress).symbol();
                 tk.decimal = IERC20(tk.tokenAddress).decimals();
                 tk.balance = IERC20(tk.tokenAddress).balanceOf(msg.sender);
-                tk.allowance = IERC20(tk.tokenAddress).allowance(msg.sender, platform);
+                tk.allowance = IERC20(tk.tokenAddress).allowance(msg.sender, delegate);
                 tk.allowanceGov = IERC20(tk.tokenAddress).allowance(msg.sender, governance);
                 tk.status = IDemaxConfig(configAddr).tokenStatus(tk.tokenAddress);
                 tk.totalSupply = IERC20(tk.tokenAddress).totalSupply();
@@ -214,13 +226,14 @@ contract DemaxQuery {
     }
     
     function queryLiquidityList() public view returns (Liquidity[] memory liquidity_list) {
-        uint count = IDemaxFactory(factory).getPlayerPairCount(msg.sender);
+        uint count = IDemaxDelegate(delegate).getPlayerPairCount(msg.sender);
         if(count > 0) {
             liquidity_list = new Liquidity[](count);
             for(uint i = 0;i < count;i++) {
                 Liquidity memory l;
-                l.pair = IDemaxFactory(factory).playerPairs(msg.sender, i);
-                l.balance = IERC20(l.pair).balanceOf(msg.sender);
+                l.lp  = IDemaxDelegate(delegate).playerPairs(msg.sender, i);
+                l.pair = IDemaxFactory(factory).getPair(IDemaxLP(l.lp).tokenA(), IDemaxLP(l.lp).tokenB());
+                l.balance = IERC20(l.lp).balanceOf(msg.sender);
                 l.totalSupply = IERC20(l.pair).totalSupply();
                 l.lastBlock = IDemaxPair(l.pair).lastMintBlock(msg.sender);
                 liquidity_list[i] = l;
@@ -229,12 +242,12 @@ contract DemaxQuery {
     }
 
     function countLiquidityList() public view returns (uint) {
-        return IDemaxFactory(factory).getPlayerPairCount(msg.sender);
+        return IDemaxDelegate(delegate).getPlayerPairCount(msg.sender);
     }
         
     function iterateLiquidityList(uint _start, uint _end) public view returns (Liquidity[] memory liquidity_list) {
         require(_start <= _end && _start >= 0 && _end >= 0, "INVAID_PARAMTERS");
-        uint count = IDemaxFactory(factory).getPlayerPairCount(msg.sender);
+        uint count = IDemaxDelegate(delegate).getPlayerPairCount(msg.sender);
         if(count > 0) {
             if (_end > count) _end = count;
             count = _end - _start;
@@ -242,8 +255,9 @@ contract DemaxQuery {
             uint index = 0;
             for(uint i = 0;i < count;i++) {
                 Liquidity memory l;
-                l.pair = IDemaxFactory(factory).playerPairs(msg.sender, i);
-                l.balance = IERC20(l.pair).balanceOf(msg.sender);
+                l.lp  = IDemaxDelegate(delegate).playerPairs(msg.sender, i);
+                l.pair = IDemaxFactory(factory).getPair(IDemaxLP(l.lp).tokenA(), IDemaxLP(l.lp).tokenB());
+                l.balance = IERC20(l.lp).balanceOf(msg.sender);
                 l.totalSupply = IERC20(l.pair).totalSupply();
                 l.lastBlock = IDemaxPair(l.pair).lastMintBlock(msg.sender);
                 liquidity_list[index] = l;
@@ -337,7 +351,7 @@ contract DemaxQuery {
         decimal = IERC20(token).decimals();
         totalSupply = IERC20(token).totalSupply();
         balance = IERC20(token).balanceOf(msg.sender);
-        allowance = IERC20(token).allowance(msg.sender, platform);
+        allowance = IERC20(token).allowance(msg.sender, delegate);
     }
     
     function queryConfigInfo(bytes32 name) public view returns (Config memory config_item){

@@ -33,6 +33,10 @@ contract DgasStaking is BaseToken {
         balanceOf[user] = balanceOf[user].sub(value);
         stakingSupply = stakingSupply.sub(value);
     }
+    
+    function _reset(address user) internal {
+        allowance[user] = block.number;
+    }
 
     function deposit(uint _amount) external returns (bool) {
         TransferHelper.safeTransferFrom(baseToken, msg.sender, address(this), _amount);

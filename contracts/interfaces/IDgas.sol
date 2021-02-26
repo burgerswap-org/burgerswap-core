@@ -12,4 +12,6 @@ interface IDgas {
     function balanceOf(address owner) external view returns (uint);
     function upgradeImpl(address _newImpl) external;
     function upgradeGovernance(address _newGovernor) external;
+    function transfer(address to, uint value) external returns (bool);
+    function approve(address spender, uint value) external returns (bool);
 }

@@ -1,54 +1,73 @@
+let fs = require("fs");
+let path = require("path");
 const ethers = require("ethers")
 const erc20 = require("../build/ERC20.json")
 const platform = require("../build/DemaxPlatform.json")
-const demaxConfig = require("../build/DemaxConfig")
-const dgas = require("../build/Dgas")
-const usdt = require("../build/usdt")
-const demaxPair = require("../build/DemaxPair")
+const demaxConfig = require("../build/DemaxConfig.json")
+const dgas = require("../build/DgasTest.json")
+const usdt = require("../build/usdt.json")
+const demaxPair = require("../build/DemaxPair.json")
 const weth = require("../build/WETH9.json")
+const demaxPool = require("../build/DemaxPool.json")
 const demaxFactory = require("../build/DemaxFactory.json")
 const demaxGovernance = require("../build/DemaxGovernance.json")
 const ballotFactory = require("../build/DemaxBallotFactory.json")
 const transferListener = require("../build/DemaxTransferListener.json")
 const demaxQuery = require("../build/DemaxQuery.json")
+const demaxQuery2 = require("../build/DemaxQuery2.json")
+const demaxDelegate = require("../build/demaxDelegate.json")
 const {bigNumberify} = require("ethers/utils")
 const Web3 = require("web3")
-const web3 = new (require("web3"))()
-const privateKey =
-  "979f3f09fea3e8d2aa8628cfa4a49989f7469b7008ae401b4e14f42fc7bc178e"
-const platformOwnerAddress = web3.eth.accounts.privateKeyToAccount(privateKey)
-  .address
+const web3 = new Web3()
+
+let config = {
+  "gasPrice": "10",
+  "url": "",
+  "pk": "",
+  "users":[]
+}
+
+if(fs.existsSync(path.join(__dirname, ".config.json"))) {
+  let _config = JSON.parse(fs.readFileSync(path.join(__dirname, ".config.json")).toString());
+  for(let k in config) {
+      config[k] = _config[k];
+  }
+}
+
+let ETHER_SEND_CONFIG = {
+  gasPrice: ethers.utils.parseUnits(config.gasPrice, "gwei")
+}
+
+console.log("current endpoint ", config.url)
+let provider = new ethers.providers.JsonRpcProvider(config.url)
+
+const privateKey = config.pk
+const ownerAddress = web3.eth.accounts.privateKeyToAccount(privateKey).address
+console.log('wallet ', ownerAddress)
 const swapUserReceiveAddress = "0xbCf2CE8F0C281C0d2be76E76c2429B13F5F07Ee2"
 const swapUserRewardsAddress = "0x971c290EE9e7fb77394c7404F7dD4CB61ceaE07A"
 const VOTE_DURATION =
   "0x564f54455f4455524154494f4e00000000000000000000000000000000000000"
 
 let ALL_ERC20_TOKENS = []
-let DGAS_ADDRESS = "0x3c9a812AB0805Ed0206CE71DCa3b49703c9bE6C3"
-let USDT_ADDRESS = "0x946D5172Cd69990c220abBdA108846e0566B05a4"
-let WETH_ADDRESS = "0x080bFBa2935DE6c8d748C177338ff78b79502605"
-let PLATFORM_ADDRESS = "0xd6be473FBB7E775125A4b3FE41238eC7eE4F79B7"
-let GOVERNANCE_ADDRESS = "0x0F1665076D31c4E56A67Ff1dE11Da6d0006c577b"
-let CONFIG_ADDRESS = "0xF7D7086868f355779fF81fFCB1Fa101F30A98ae5"
-let BALLOT_FACTORY_ADDRESS = "0xc42097906ecd1F9546eD59f4f1e459821e9A0805"
-let FACTORY_ADDRESS = "0x65577b44bAC10e1f6d30D7998c2AF68C64962d5a"
-let TRANSFER_LISTENER_ADDRESS = "0x30F344B09b2A37A6D61e14B8ABd5D7Dd1cd0775D"
-let DEMAX_QUERY_ADDRESS = "0x30F344B09b2A37A6D61e14B8ABd5D7Dd1cd0775D"
+let DGAS_ADDRESS = ""
+let USDT_ADDRESS = ""
+let WETH_ADDRESS = ""
+let PLATFORM_ADDRESS = ""
+let GOVERNANCE_ADDRESS = ""
+let CONFIG_ADDRESS = ""
+let BALLOT_FACTORY_ADDRESS = ""
+let FACTORY_ADDRESS = ""
+let TRANSFER_LISTENER_ADDRESS = ""
+let POOL_ADDRESS = ""
+let QUERY_ADDRESS = ""
+let QUERY2_ADDRESS = ""
+let DELEGATE_ADDRESS = ""
 // ALL_ERC20_TOKENS.push(DGAS_ADDRESS, USDT_ADDRESS, WETH_ADDRESS)
 let TOKENA_ADDRESS = ""
 let PLATFORM
 
-const XIAOWU_ADDRESS = "0x4A2DaA71CB58138dFe05B914fBd98c7b9822cbF6"
-const XIGUA_ADDRESS = "0xA768267D5b04f0454272664F4166F68CFc447346"
-const WANG_KUI = "0xc03C12101AE20B8e763526d6841Ece893248a069"
-const LAO_YI_ADDRESS = "0x866e43291293892bd0980ADc4Ec5166F33623D86"
-
-const NEED_TRANSFER_ADDRESS = [
-  XIAOWU_ADDRESS,
-  XIGUA_ADDRESS,
-  WANG_KUI,
-  LAO_YI_ADDRESS
-]
+const NEED_TRANSFER_ADDRESS = config.users
 
 const MOCK_TOKENS = [
   {name: "tokenA", symbol: "A"}
@@ -70,18 +89,6 @@ const MOCK_TOKENS = [
   // { name: 'token5', symbol: 's5' },
   // { name: 'token6', symbol: 's6' }
 ]
-
-const ETHER_SEND_CONFIG = {
-  gasPrice: ethers.utils.parseUnits("10", "gwei")
-}
-
-const isLocalEtherNetWork = false
-const connectUrl =
-  isLocalEtherNetWork
-  ? "http://47.75.205.56:8545"
-  : "https://koava.infura.io/v3/f855a808a4174908b39f21093b10803a"
-console.log("current endpoint  ",connectUrl)
-let provider = new ethers.providers.JsonRpcProvider(connectUrl)
 
 function expandTo18Decimals(n, p = 18) {
   return bigNumberify(n).mul(bigNumberify(10).pow(p))
@@ -105,7 +112,7 @@ function getPlatformIns() {
 async function manualListToken() {
   console.log("---manualListToken------")
   let ins = new ethers.Contract(CONFIG_ADDRESS, demaxConfig.abi, getWallet())
-  let tx = await ins.modifyGovernor(platformOwnerAddress)
+  let tx = await ins.modifyGovernor(ownerAddress)
   await waitForMint(tx.hash)
   tx = await ins.registryToken(TOKENA_ADDRESS)
   await waitForMint(tx.hash)
@@ -143,11 +150,13 @@ async function initialize() {
     transferListener.abi,
     getWallet()
   )
+  console.log('transferListener initialize...')
   let tx = await ins.initialize(
     DGAS_ADDRESS,
     FACTORY_ADDRESS,
     WETH_ADDRESS,
     PLATFORM_ADDRESS,
+    ownerAddress,
     ETHER_SEND_CONFIG
   )
   await waitForMint(tx.hash)
@@ -157,6 +166,7 @@ async function initialize() {
     demaxGovernance.abi,
     getWallet()
   )
+  console.log('demaxGovernance initialize...')
   tx = await ins.initialize(
     PLATFORM_ADDRESS,
     CONFIG_ADDRESS,
@@ -166,6 +176,7 @@ async function initialize() {
   await waitForMint(tx.hash)
 
   ins = new ethers.Contract(PLATFORM_ADDRESS, platform.abi, getWallet())
+  console.log('platform initialize...')
   tx = await ins.initialize(
     DGAS_ADDRESS,
     CONFIG_ADDRESS,
@@ -173,40 +184,93 @@ async function initialize() {
     WETH_ADDRESS,
     GOVERNANCE_ADDRESS,
     TRANSFER_LISTENER_ADDRESS,
+    POOL_ADDRESS,
+    ETHER_SEND_CONFIG
+  )
+  await waitForMint(tx.hash)
+
+  ins = new ethers.Contract(POOL_ADDRESS, demaxPool.abi, getWallet())
+  console.log('demaxPool initialize...')
+  tx = await ins.initialize(
+    DGAS_ADDRESS,
+    WETH_ADDRESS,
+    FACTORY_ADDRESS,
+    PLATFORM_ADDRESS,
+    CONFIG_ADDRESS,
+    GOVERNANCE_ADDRESS,
     ETHER_SEND_CONFIG
   )
   await waitForMint(tx.hash)
 
   ins = new ethers.Contract(CONFIG_ADDRESS, demaxConfig.abi, getWallet())
+  console.log('demaxConfig initialize...')
   tx = await ins.initialize(
     DGAS_ADDRESS,
     GOVERNANCE_ADDRESS,
     PLATFORM_ADDRESS,
-    platformOwnerAddress,
+    ownerAddress,
     ALL_ERC20_TOKENS,
     ETHER_SEND_CONFIG
   )
   await waitForMint(tx.hash)
+
+  // set FEE_LP_REWARD_PERCENT
+  tx = await ins.changeConfig(
+    '0x4645455f4c505f5245574152445f50455243454e540000000000000000000000',
+    1000,
+    6000,
+    250,
+    4000,
+    ETHER_SEND_CONFIG
+  )
+  await waitForMint(tx.hash)
+
+  // set FEE_GOVERNANCE_REWARD_PERCENT
+  tx = await ins.changeConfig(
+    '0x4645455f474f5645524e414e43455f5245574152445f50455243454e54000000',
+    1000,
+    6000,
+    250,
+    5000,
+    ETHER_SEND_CONFIG
+  )
+  await waitForMint(tx.hash)
+
   console.log("have list tokens length ", (await ins.tokenCount()).toString())
   console.log(
     "the first list token address ",
     (await ins.tokenList(0)).toString()
   )
-  await sleep(1000)
+
+  console.log("dgas upgradeImpl ", TRANSFER_LISTENER_ADDRESS)
   ins = new ethers.Contract(DGAS_ADDRESS, dgas.abi, getWallet())
   tx = await ins.upgradeImpl(TRANSFER_LISTENER_ADDRESS, {
     ...ETHER_SEND_CONFIG
   })
   await waitForMint(tx.hash)
+
+  console.log("dgas upgradeGovernance ", GOVERNANCE_ADDRESS)
   tx = await ins.upgradeGovernance(GOVERNANCE_ADDRESS, {
     ...ETHER_SEND_CONFIG
   })
+  await waitForMint(tx.hash)
+
+  // DEMAX QUERY
+  console.log("demaxQuery upgrade ", GOVERNANCE_ADDRESS)
+  ins = new ethers.Contract(QUERY_ADDRESS, demaxQuery.abi, getWallet())
+  tx = await ins.upgrade(CONFIG_ADDRESS, PLATFORM_ADDRESS, FACTORY_ADDRESS, GOVERNANCE_ADDRESS, TRANSFER_LISTENER_ADDRESS, ETHER_SEND_CONFIG)
+  await waitForMint(tx.hash)
+
+  // DEMAX QUERY2
+  console.log("demaxQuery2 upgrade ", GOVERNANCE_ADDRESS)
+  ins = new ethers.Contract(QUERY2_ADDRESS, demaxQuery2.abi, getWallet())
+  tx = await ins.upgrade(CONFIG_ADDRESS, PLATFORM_ADDRESS, FACTORY_ADDRESS, GOVERNANCE_ADDRESS, TRANSFER_LISTENER_ADDRESS, DELEGATE_ADDRESS, ETHER_SEND_CONFIG)
   await waitForMint(tx.hash)
 }
 
 async function addETHForDAGSLiquidity() {
   console.log("---addETHForDAGSLiquidity1")
-  let nonce = await provider.getTransactionCount(platformOwnerAddress)
+  let nonce = await provider.getTransactionCount(ownerAddress)
   let ins = new ethers.Contract(USDT_ADDRESS, usdt.abi, getWallet())
   let tx = await ins.approve(PLATFORM_ADDRESS, expandTo18Decimals(1000), {
     ...ETHER_SEND_CONFIG,
@@ -223,7 +287,7 @@ async function addETHForDAGSLiquidity() {
   await waitForMint(tx.hash)
   console.log(
     "before mined dgas amount ",
-    (await insDGAS.balanceOf(platformOwnerAddress)).toString(),
+    (await insDGAS.balanceOf(ownerAddress)).toString(),
     await getBlockNumber()
   )
 
@@ -249,7 +313,7 @@ async function addETHForDAGSLiquidity() {
   await waitForMint(tx.hash)
   console.log(
     "after mined dgas amount ",
-    (await insDGAS.balanceOf(platformOwnerAddress)).toString(),
+    (await insDGAS.balanceOf(ownerAddress)).toString(),
     await getBlockNumber()
   )
   tx = await ins.addLiquidityETH(
@@ -364,6 +428,7 @@ async function deploy() {
   TRANSFER_LISTENER_ADDRESS = demaxTransferListenerIns.address
   await waitForMint(demaxTransferListenerIns.deployTransaction.hash)
   console.log("transfer listener address " + demaxTransferListenerIns.address)
+
   // DEMAX FACTORY
   factory = new ethers.ContractFactory(
     demaxFactory.abi,
@@ -375,22 +440,51 @@ async function deploy() {
   await waitForMint(demaxFactoryIns.deployTransaction.hash)
   console.log("demax factory address  " + demaxFactoryIns.address)
 
+  //DEMAX POOL 
+  factory = new ethers.ContractFactory(
+    demaxPool.abi,
+    demaxPool.bytecode,
+    walletWithProvider
+  )
+  const demaxPoolIns = await factory.deploy()
+  POOL_ADDRESS = demaxPoolIns.address
+  await waitForMint(demaxPoolIns.deployTransaction.hash)
+  console.log("demax pool address  " + demaxPoolIns.address)
+
+  //DEMAX DELEGATE 
+  factory = new ethers.ContractFactory(
+    demaxDelegate.abi,
+    demaxDelegate.bytecode,
+    walletWithProvider
+  )
+  const demaxDelegateIns = await factory.deploy(PLATFORM_ADDRESS, POOL_ADDRESS, DGAS_ADDRESS)
+  DELEGATE_ADDRESS = demaxDelegateIns.address
+  await waitForMint(demaxDelegateIns.deployTransaction.hash)
+  console.log("demax delegate address  " + demaxDelegateIns.address)
+
   // DEMAX QUERY
   factory = new ethers.ContractFactory(
     demaxQuery.abi,
     demaxQuery.bytecode,
     walletWithProvider
   )
-  // const demaxQueryIns = await factory.deploy(CONFIG_ADDRESS,PLATFORM_ADDRESS,FACTORY_ADDRESS,GOVERNANCE_ADDRESS, CONFIG_ADDRESS)
-  const demaxQueryIns = await factory.deploy(
-    CONFIG_ADDRESS,
-    PLATFORM_ADDRESS,
-    FACTORY_ADDRESS,
-    GOVERNANCE_ADDRESS,
-    ETHER_SEND_CONFIG
-  )
+  
+  const demaxQueryIns = await factory.deploy()
+  QUERY_ADDRESS = demaxQueryIns.address
   await waitForMint(demaxQueryIns.deployTransaction.hash)
   console.log("demax query address" + demaxQueryIns.address)
+
+  // DEMAX QUERY2
+  factory = new ethers.ContractFactory(
+    demaxQuery2.abi,
+    demaxQuery2.bytecode,
+    walletWithProvider
+  )
+  
+  const demaxQuery2Ins = await factory.deploy()
+  QUERY2_ADDRESS = demaxQuery2Ins.address
+  await waitForMint(demaxQuery2Ins.deployTransaction.hash)
+  console.log("demax query2 address" + demaxQuery2Ins.address)
 
   // erc20
   factory = new ethers.ContractFactory(
@@ -424,7 +518,7 @@ async function deploy() {
 deploy()
   .then(initialize)
   // .then(manualListToken)
-  .then(addETHForDAGSLiquidity)
+  // .then(addETHForDAGSLiquidity)
 
 // const w3 = new Web3(
 //     'https://rinkeby.infura.io/v3/f855a808a4174908b39f21093b10803a'

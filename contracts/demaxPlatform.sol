@@ -9,6 +9,7 @@ import './interfaces/IDemaxConfig.sol';
 import './interfaces/IERC20.sol';
 import './interfaces/IDemaxFactory.sol';
 import './interfaces/IDemaxPair.sol';
+import './interfaces/IDemaxPool.sol';
 import './modules/Ownable.sol';
 import './interfaces/IDemaxTransferListener.sol';
 
@@ -20,6 +21,7 @@ contract DemaxPlatform is Ownable {
     address public WETH;
     address public GOVERNANCE;
     address public TRANSFER_LISTENER;
+    address public POOL;
     uint256 public constant PERCENT_DENOMINATOR = 10000;
 
     bool public isPause;
@@ -61,7 +63,8 @@ contract DemaxPlatform is Ownable {
         address _FACTORY,
         address _WETH,
         address _GOVERNANCE,
-        address _TRANSFER_LISTENER
+        address _TRANSFER_LISTENER,
+        address _POOL
     ) external onlyOwner {
         DGAS = _DGAS;
         CONFIG = _CONFIG;
@@ -69,6 +72,7 @@ contract DemaxPlatform is Ownable {
         WETH = _WETH;
         GOVERNANCE = _GOVERNANCE;
         TRANSFER_LISTENER = _TRANSFER_LISTENER;
+        POOL = _POOL;
     }
 
     function pause() external onlyOwner {
@@ -114,23 +118,6 @@ contract DemaxPlatform is Ownable {
         IDemaxFactory(FACTORY).addPlayerPair(msg.sender, IDemaxFactory(FACTORY).getPair(tokenA, tokenB));
     }
 
-    function _calcDGASRate(
-        address tokenA,
-        address tokenB,
-        uint256 amountA,
-        uint256 amountB
-    ) internal view returns (uint256 value) {
-        uint256 tokenAValue = 0;
-        uint256 tokenBValue = 0;
-        if (tokenA == WETH || tokenA == DGAS) {
-            tokenAValue = tokenA == WETH ? amountA : DemaxSwapLibrary.quoteEnhance(FACTORY, DGAS, WETH, amountA);
-        }
-        if (tokenB == WETH || tokenB == DGAS) {
-            tokenBValue = tokenB == WETH ? amountB : DemaxSwapLibrary.quoteEnhance(FACTORY, DGAS, WETH, amountB);
-        }
-        return tokenAValue + tokenBValue;
-    }
-
     function addLiquidity(
         address tokenA,
         address tokenB,
@@ -153,7 +140,12 @@ contract DemaxPlatform is Ownable {
         address pair = DemaxSwapLibrary.pairFor(FACTORY, tokenA, tokenB);
         TransferHelper.safeTransferFrom(tokenA, msg.sender, pair, _amountA);
         TransferHelper.safeTransferFrom(tokenB, msg.sender, pair, _amountB);
+
+        // notify pool
+        IDemaxPool(POOL).preProductivityChanged(pair, msg.sender);
         _liquidity = IDemaxPair(pair).mint(msg.sender);
+        IDemaxPool(POOL).postProductivityChanged(pair, msg.sender);
+
         _transferNotify(msg.sender, pair, tokenA, _amountA);
         _transferNotify(msg.sender, pair, tokenB, _amountB);
         emit AddLiquidity(msg.sender, tokenA, tokenB, _amountA, _amountB);
@@ -188,7 +180,12 @@ contract DemaxPlatform is Ownable {
         TransferHelper.safeTransferFrom(token, msg.sender, pair, amountToken);
         IWETH(WETH).deposit{value: amountETH}();
         assert(IWETH(WETH).transfer(pair, amountETH));
+
+        // notify pool
+        IDemaxPool(POOL).preProductivityChanged(pair, msg.sender);
         liquidity = IDemaxPair(pair).mint(msg.sender);
+        IDemaxPool(POOL).postProductivityChanged(pair, msg.sender);
+
         _transferNotify(msg.sender, pair, WETH, amountETH);
         _transferNotify(msg.sender, pair, token, amountToken);
         emit AddLiquidity(msg.sender, token, WETH, amountToken, amountETH);
@@ -209,7 +206,12 @@ contract DemaxPlatform is Ownable {
         uint256 _liquidity = liquidity;
         address _tokenA = tokenA;
         address _tokenB = tokenB;
+
+        // notify pool
+        IDemaxPool(POOL).preProductivityChanged(pair, msg.sender);
         (uint256 amount0, uint256 amount1) = IDemaxPair(pair).burn(msg.sender, to, _liquidity);
+        IDemaxPool(POOL).postProductivityChanged(pair, msg.sender);
+
         (address token0, ) = DemaxSwapLibrary.sortTokens(_tokenA, _tokenB);
         (amountA, amountB) = _tokenA == token0 ? (amount0, amount1) : (amount1, amount0);
         _transferNotify(pair, to, _tokenA, amountA);
@@ -335,18 +337,18 @@ contract DemaxPlatform is Ownable {
             address output = path[i + 1];
             address currentPair = DemaxSwapLibrary.pairFor(FACTORY, input, output);
             if (input == DGAS) {
-                IDemaxPair(currentPair).swapFee(fee, DGAS, GOVERNANCE);
-                _transferNotify(currentPair, GOVERNANCE, DGAS, fee);
+                IDemaxPair(currentPair).swapFee(fee, DGAS, POOL);
+                _transferNotify(currentPair, POOL, DGAS, fee);
             } else {
                 IDemaxPair(currentPair).swapFee(fee, input, DemaxSwapLibrary.pairFor(FACTORY, input, DGAS));
                 (uint256 reserveIn, uint256 reserveDGAS) = DemaxSwapLibrary.getReserves(FACTORY, input, DGAS);
                 uint256 feeOut = DemaxSwapLibrary.getAmountOut(fee, reserveIn, reserveDGAS);
-                IDemaxPair(DemaxSwapLibrary.pairFor(FACTORY, input, DGAS)).swapFee(feeOut, DGAS, GOVERNANCE);
+                IDemaxPair(DemaxSwapLibrary.pairFor(FACTORY, input, DGAS)).swapFee(feeOut, DGAS, POOL);
                 _transferNotify(currentPair, DemaxSwapLibrary.pairFor(FACTORY, input, DGAS), input, fee);
-                _transferNotify(DemaxSwapLibrary.pairFor(FACTORY, input, DGAS), GOVERNANCE, DGAS, feeOut);
+                _transferNotify(DemaxSwapLibrary.pairFor(FACTORY, input, DGAS), POOL, DGAS, feeOut);
                 fee = feeOut;
             }
-            if (fee > 0) IDemaxGovernance(GOVERNANCE).addReward(fee);
+            if (fee > 0) IDemaxPool(POOL).addRewardFromPlatform(currentPair, fee);
         }
     }
 

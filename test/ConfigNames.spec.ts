@@ -16,6 +16,7 @@ describe('ConfigNames', () => {
   })
 
   it('names', async () => {
+    log.info('EMPTY', formatBytes32String(''))
     log.info('PRODUCE_DGAS_RATE', formatBytes32String('PRODUCE_DGAS_RATE'))
     log.info('SWAP_FEE_PERCENT', formatBytes32String('SWAP_FEE_PERCENT'))
     log.info('LIST_DGAS_AMOUNT', formatBytes32String('LIST_DGAS_AMOUNT'))
@@ -29,6 +30,10 @@ describe('ConfigNames', () => {
     log.info('VOTE_REWARD_PERCENT', formatBytes32String('VOTE_REWARD_PERCENT'))
     log.info('TOKEN_PENGDING_SWITCH', formatBytes32String('TOKEN_PENGDING_SWITCH'))
     log.info('TOKEN_PENGDING_TIME', formatBytes32String('TOKEN_PENGDING_TIME'))
+    log.info('FEE_LP_REWARD_PERCENT', formatBytes32String('FEE_LP_REWARD_PERCENT'))
+    log.info('FEE_GOVERNANCE_REWARD_PERCENT', formatBytes32String('FEE_GOVERNANCE_REWARD_PERCENT'))
+    log.info('DEV_PRECENT', formatBytes32String('DEV_PRECENT'))
+    
   })
 
 })

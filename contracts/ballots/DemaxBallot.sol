@@ -65,7 +65,7 @@ contract DemaxBallot {
      * @param voter address of voter
      */
     function _giveRightToVote(address voter) private returns (Voter storage) {
-        require(block.number < endBlockNumber, "Bollot is ended");
+        require(block.number < endBlockNumber, "Ballot is ended");
         Voter storage sender = voters[voter];
         require(!sender.voted, "You already voted");
         sender.weight += IERC20(governor).balanceOf(voter);
@@ -99,8 +99,8 @@ contract DemaxBallot {
             // If the delegate did not vote yet,
             // add to her weight.
             delegate_.weight += sender.weight;
-            total += sender.weight;
         }
+        sender.weight = 0;
     }
 
     /**
