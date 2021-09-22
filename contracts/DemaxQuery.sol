@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity >= 0.5.1;
+pragma solidity >= 0.6.6;
 
 struct Config {
         uint minValue;
@@ -111,13 +111,13 @@ contract DemaxQuery {
     address public owner;
     address public governance;
     address public transferListener;
+
+    mapping(address => bool) disabledTokens;
     
     struct Proposal {
         address proposer;
         address ballotAddress;
         address tokenAddress;
-        string subject;
-        string content;
         uint createTime;
         uint endBlock;
         bool end;
@@ -133,17 +133,19 @@ contract DemaxQuery {
         uint value;
         bytes32 key;
         uint currentValue;
+        string subject;
+        string content;
     }
     
     struct Token {
         address tokenAddress;
-        string symbol;
         uint decimal;
         uint balance;
         uint allowance;
         uint allowanceGov;
         uint status;
         uint totalSupply;
+        string symbol;
     }
     
     struct Liquidity {
@@ -158,12 +160,38 @@ contract DemaxQuery {
     }
     
     function upgrade(address _config, address _platform, address _factory, address _governance, address _transferListener) public {
-        require(owner == msg.sender);
+        require(owner == msg.sender, 'FORBIDDEN');
         configAddr = _config;
         platform = _platform;
         factory = _factory;
         governance = _governance;
         transferListener = _transferListener;
+    }
+
+    function setDisabledToken(address _token, bool _value) public {
+        require(owner == msg.sender, 'FORBIDDEN');
+        disabledTokens[_token] = _value;
+    }
+
+    function setDisabledTokens(address[] memory _tokens, bool[] memory _values) public {
+        require(_tokens.length == _values.length, "INVAID_PARAMTERS");
+        require(owner == msg.sender, 'FORBIDDEN');
+        for(uint i; i<_tokens.length; i++) {
+            setDisabledToken(_tokens[i], _values[i]);
+        }
+    }
+
+    function getToken(address _token) public view returns (Token memory tk) {
+        tk.tokenAddress = _token;
+        tk.status = IDemaxConfig(configAddr).tokenStatus(tk.tokenAddress);
+        if(disabledTokens[tk.tokenAddress] == false) {
+            tk.symbol = IERC20(tk.tokenAddress).symbol();
+            tk.decimal = IERC20(tk.tokenAddress).decimals();
+            tk.balance = IERC20(tk.tokenAddress).balanceOf(msg.sender);
+            tk.allowance = IERC20(tk.tokenAddress).allowance(msg.sender, platform);
+            tk.allowanceGov = IERC20(tk.tokenAddress).allowance(msg.sender, governance);
+            tk.totalSupply = IERC20(tk.tokenAddress).totalSupply();
+        }
     }
    
     function queryTokenList() public view returns (Token[] memory token_list) {
@@ -171,16 +199,7 @@ contract DemaxQuery {
         if(count > 0) {
             token_list = new Token[](count);
             for(uint i = 0;i < count;i++) {
-                Token memory tk;
-                tk.tokenAddress = IDemaxConfig(configAddr).tokenList(i);
-                tk.symbol = IERC20(tk.tokenAddress).symbol();
-                tk.decimal = IERC20(tk.tokenAddress).decimals();
-                tk.balance = IERC20(tk.tokenAddress).balanceOf(msg.sender);
-                tk.allowance = IERC20(tk.tokenAddress).allowance(msg.sender, platform);
-                tk.allowanceGov = IERC20(tk.tokenAddress).allowance(msg.sender, governance);
-                tk.status = IDemaxConfig(configAddr).tokenStatus(tk.tokenAddress);
-                tk.totalSupply = IERC20(tk.tokenAddress).totalSupply();
-                token_list[i] = tk;
+                token_list[i] = getToken(IDemaxConfig(configAddr).tokenList(i));
             }
         }
     }
@@ -194,20 +213,12 @@ contract DemaxQuery {
         uint count = IDemaxConfig(configAddr).tokenCount();
         if(count > 0) {
             if (_end > count) _end = count;
+            if (_start > _end) _start = _end;
             count = _end - _start;
             token_list = new Token[](count);
             uint index = 0;
             for(uint i = _start; i < _end; i++) {
-                Token memory tk;
-                tk.tokenAddress = IDemaxConfig(configAddr).tokenList(i);
-                tk.symbol = IERC20(tk.tokenAddress).symbol();
-                tk.decimal = IERC20(tk.tokenAddress).decimals();
-                tk.balance = IERC20(tk.tokenAddress).balanceOf(msg.sender);
-                tk.allowance = IERC20(tk.tokenAddress).allowance(msg.sender, platform);
-                tk.allowanceGov = IERC20(tk.tokenAddress).allowance(msg.sender, governance);
-                tk.status = IDemaxConfig(configAddr).tokenStatus(tk.tokenAddress);
-                tk.totalSupply = IERC20(tk.tokenAddress).totalSupply();
-                token_list[index] = tk;
+                token_list[index] = getToken(IDemaxConfig(configAddr).tokenList(i));
                 index++;
             }
         }
@@ -237,6 +248,7 @@ contract DemaxQuery {
         uint count = IDemaxFactory(factory).getPlayerPairCount(msg.sender);
         if(count > 0) {
             if (_end > count) _end = count;
+            if (_start > _end) _start = _end;
             count = _end - _start;
             liquidity_list = new Liquidity[](count);
             uint index = 0;
@@ -253,7 +265,7 @@ contract DemaxQuery {
     }
 
     function queryPairListInfo(address[] memory pair_list) public view returns (address[] memory token0_list, address[] memory token1_list,
-    uint[] memory reserve0_list, uint[] memory reserve1_list) {
+        uint[] memory reserve0_list, uint[] memory reserve1_list) {
         uint count = pair_list.length;
         if(count > 0) {
             token0_list = new address[](count);
@@ -331,6 +343,12 @@ contract DemaxQuery {
             proposal.currentValue = IDemaxConfig(governance).getConfigValue(proposal.key);
         }
     }
+
+    function getProposalByIndex(uint index) public view returns (Proposal memory proposal){
+        address ballot_address = IDemaxGovernance(governance).ballots(index);
+        proposal = generateProposal(ballot_address);
+        return proposal;
+    }
     
     function queryTokenItemInfo(address token) public view returns (string memory symbol, uint decimal, uint totalSupply, uint balance, uint allowance) {
         symbol = IERC20(token).symbol();
@@ -354,8 +372,7 @@ contract DemaxQuery {
         uint count = IDemaxGovernance(governance).ballotCount();
         proposal_list = new Proposal[](count);
         for(uint i = 0;i < count;i++) {
-            address ballot_address = IDemaxGovernance(governance).ballots(i);
-            proposal_list[count - i - 1] = generateProposal(ballot_address);
+            proposal_list[count - i - 1] = getProposalByIndex(i);
         }
     }
 
@@ -367,12 +384,12 @@ contract DemaxQuery {
         require(_start <= _end && _start >= 0 && _end >= 0, "INVAID_PARAMTERS");
         uint count = IDemaxGovernance(governance).ballotCount();
         if (_end > count) _end = count;
+        if (_start > _end) _start = _end;
         count = _end - _start;
         proposal_list = new Proposal[](count);
         uint index = 0;
         for(uint i = 0;i < count;i++) {
-            address ballot_address = IDemaxGovernance(governance).ballots(i);
-            proposal_list[index] = generateProposal(ballot_address);
+            proposal_list[index] = getProposalByIndex(i);
             index++;
         }
     }
@@ -381,14 +398,16 @@ contract DemaxQuery {
         require(_end <= _start && _end >= 0 && _start >= 0, "INVAID_PARAMTERS");
         uint count = IDemaxGovernance(governance).ballotCount();
         if (_start > count) _start = count;
+        if (_end > _start) _end = _start;
         count = _start - _end;
         proposal_list = new Proposal[](count);
         uint index = 0;
-        for(uint i = 0;i < count;i++) {
-            address ballot_address = IDemaxGovernance(governance).ballots(i);
-            proposal_list[index] = generateProposal(ballot_address);
+        for(uint i = _end;i < _start; i++) {
+            uint j = _start - index -1;
+            proposal_list[index] = getProposalByIndex(j);
             index++;
         }
+        return proposal_list;
     }
         
     function queryPairWeights(address[] memory pairs) public view returns (uint[] memory weights){

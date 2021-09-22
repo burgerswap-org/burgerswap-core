@@ -9,6 +9,7 @@ import './libraries/DemaxSwapLibrary.sol';
 import './libraries/SafeMath.sol';
 
 contract DemaxTransferListener is Ownable {
+    using SafeMath for uint;
     uint256 public version = 2;
     address public DGAS;
     address public PLATFORM;
@@ -75,9 +76,9 @@ contract DemaxTransferListener is Ownable {
         (uint reserve0, uint reserve1, ) = IDemaxPair(_pair).getReserves();
         uint currentProdutivity = 0;
         if(token0 == DGAS) {
-            currentProdutivity = reserve0 * pairWeights[_pair];
+            currentProdutivity = reserve0.mul(pairWeights[_pair]);
         } else if(token1 == DGAS) {
-            currentProdutivity = reserve1 * pairWeights[_pair];
+            currentProdutivity = reserve1.mul(pairWeights[_pair]);
         }
 
         if(lastProdutivity != currentProdutivity) {

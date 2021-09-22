@@ -77,7 +77,6 @@ contract TokenRegistry is Governable {
         require(tokenStatus[_token] != _status, 'TokenRegistry: TOKEN_STATUS_NO_CHANGE');
         if (tokenStatus[_token] == NONE) {
             tokenCount++;
-            require(tokenCount <= uint(-1), 'TokenRegistry: OVERFLOW');
             tokenList.push(_token);
         }
         tokenStatus[_token] = _status;

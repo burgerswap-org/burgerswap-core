@@ -145,6 +145,8 @@ contract DemaxPool is Ownable {
         totalReward = totalReward.sub(amount);
         require(amount > 0, "NOTHING TO MINT");
         
+        userInfo.rewardEarn = 0;
+
         if(_rewardToken == DGAS) {
             TransferHelper.safeTransfer(DGAS, msg.sender, amount);
         } else if(_rewardToken == WETH) {
@@ -163,7 +165,6 @@ contract DemaxPool is Ownable {
             IDemaxPlatform(PLATFORM).swapExactTokensForTokens(amount, 0, path, msg.sender, block.timestamp + 1);
         }
         
-        userInfo.rewardEarn = 0;
         emit ClaimReward(msg.sender, _pair, _rewardToken, amount);
     }
     

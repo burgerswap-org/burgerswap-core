@@ -168,7 +168,7 @@ async function initialize() {
   )
   console.log('demaxGovernance initialize...')
   tx = await ins.initialize(
-    PLATFORM_ADDRESS,
+    POOL_ADDRESS,
     CONFIG_ADDRESS,
     BALLOT_FACTORY_ADDRESS,
     ETHER_SEND_CONFIG

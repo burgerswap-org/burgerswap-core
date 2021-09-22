@@ -20,12 +20,6 @@ contract ERC2917Impl is IERC2917, UpgradableProduct, UpgradableGovernance {
     uint public mintCumulation;
     uint public amountPerBlock;
 
-    uint public nounce;
-
-    function incNounce() public {
-        nounce ++;
-    }
-
     // implementation of ERC20 interfaces.
     string override public name;
     string override public symbol;

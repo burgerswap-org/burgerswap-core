@@ -35,7 +35,6 @@ contract DemaxFactory {
 
     function getPlayerPairCount(address player) external view returns (uint256) {
         address[] storage existAddress = playerPairs[player];
-        if (existAddress.length == 0) return 0;
         return existAddress.length;
     }
 

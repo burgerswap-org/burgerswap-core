@@ -108,9 +108,9 @@ contract BaseShareField {
         _audit(user);
         require(users[user].rewardEarn > 0, "NOTHING TO MINT");
         uint amount = users[user].rewardEarn;
-        TransferHelper.safeTransfer(shareToken, msg.sender, amount);
         users[user].rewardEarn = 0;
-        mintedShare += amount;
+        mintedShare = mintedShare.add(amount);
+        TransferHelper.safeTransfer(shareToken, msg.sender, amount);
         return amount;
     }
 

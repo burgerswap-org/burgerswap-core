@@ -46,6 +46,9 @@ interface IDemaxFactory {
 interface IDemaxDelegate {
     function getPlayerPairCount(address player) external view returns(uint);
     function playerPairs(address user, uint index) external view returns(address);
+    function countDelegateHistory() external view returns(uint);
+    function delegateHistory(uint index) external view returns(address);
+    function getDelegate(address _tokenA, address _tokenB) external view returns (address);
 }
 
 interface IDemaxLP {
@@ -121,6 +124,8 @@ contract DemaxQuery2 {
     address public governance;
     address public transferListener;
     address public delegate;
+
+    mapping(address => bool) disabledTokens;
     
     struct Proposal {
         address proposer;
@@ -162,6 +167,7 @@ contract DemaxQuery2 {
         uint balance;
         uint totalSupply;
         uint lastBlock;
+        address delegate;
     }
     
     constructor() public {
@@ -169,7 +175,7 @@ contract DemaxQuery2 {
     }
     
     function upgrade(address _config, address _platform, address _factory, address _governance, address _transferListener, address _delegate) public {
-        require(owner == msg.sender);
+        require(owner == msg.sender, 'FORBIDDEN');
         configAddr = _config;
         platform = _platform;
         factory = _factory;
@@ -177,22 +183,39 @@ contract DemaxQuery2 {
         transferListener = _transferListener;
         delegate = _delegate;
     }
-   
+
+    function setDisabledToken(address _token, bool _value) public {
+        require(owner == msg.sender, 'FORBIDDEN');
+        disabledTokens[_token] = _value;
+    }
+
+    function setDisabledTokens(address[] memory _tokens, bool[] memory _values) public {
+        require(_tokens.length == _values.length, "INVAID_PARAMTERS");
+        require(owner == msg.sender, 'FORBIDDEN');
+        for(uint i; i<_tokens.length; i++) {
+            setDisabledToken(_tokens[i], _values[i]);
+        }
+    }
+
+    function getToken(address _token) public view returns (Token memory tk) {
+        tk.tokenAddress = _token;
+        tk.status = IDemaxConfig(configAddr).tokenStatus(tk.tokenAddress);
+        if(disabledTokens[tk.tokenAddress] == false) {
+            tk.symbol = IERC20(tk.tokenAddress).symbol();
+            tk.decimal = IERC20(tk.tokenAddress).decimals();
+            tk.balance = IERC20(tk.tokenAddress).balanceOf(msg.sender);
+            tk.allowance = IERC20(tk.tokenAddress).allowance(msg.sender, platform);
+            tk.allowanceGov = IERC20(tk.tokenAddress).allowance(msg.sender, governance);
+            tk.totalSupply = IERC20(tk.tokenAddress).totalSupply();
+        }
+    }
+
     function queryTokenList() public view returns (Token[] memory token_list) {
         uint count = IDemaxConfig(configAddr).tokenCount();
         if(count > 0) {
             token_list = new Token[](count);
             for(uint i = 0;i < count;i++) {
-                Token memory tk;
-                tk.tokenAddress = IDemaxConfig(configAddr).tokenList(i);
-                tk.symbol = IERC20(tk.tokenAddress).symbol();
-                tk.decimal = IERC20(tk.tokenAddress).decimals();
-                tk.balance = IERC20(tk.tokenAddress).balanceOf(msg.sender);
-                tk.allowance = IERC20(tk.tokenAddress).allowance(msg.sender, delegate);
-                tk.allowanceGov = IERC20(tk.tokenAddress).allowance(msg.sender, governance);
-                tk.status = IDemaxConfig(configAddr).tokenStatus(tk.tokenAddress);
-                tk.totalSupply = IERC20(tk.tokenAddress).totalSupply();
-                token_list[i] = tk;
+                token_list[i] =  getToken(IDemaxConfig(configAddr).tokenList(i));
             }
         }
     }
@@ -206,68 +229,91 @@ contract DemaxQuery2 {
         uint count = IDemaxConfig(configAddr).tokenCount();
         if(count > 0) {
             if (_end > count) _end = count;
+            if (_start > _end) _start = _end;
             count = _end - _start;
             token_list = new Token[](count);
             uint index = 0;
             for(uint i = _start; i < _end; i++) {
-                Token memory tk;
-                tk.tokenAddress = IDemaxConfig(configAddr).tokenList(i);
-                tk.symbol = IERC20(tk.tokenAddress).symbol();
-                tk.decimal = IERC20(tk.tokenAddress).decimals();
-                tk.balance = IERC20(tk.tokenAddress).balanceOf(msg.sender);
-                tk.allowance = IERC20(tk.tokenAddress).allowance(msg.sender, delegate);
-                tk.allowanceGov = IERC20(tk.tokenAddress).allowance(msg.sender, governance);
-                tk.status = IDemaxConfig(configAddr).tokenStatus(tk.tokenAddress);
-                tk.totalSupply = IERC20(tk.tokenAddress).totalSupply();
-                token_list[index] = tk;
+                token_list[index] =  getToken(IDemaxConfig(configAddr).tokenList(i));
                 index++;
             }
         }
     }
+
+    function getLiquidity(address _delegate, uint _i) public view returns (Liquidity memory l) {
+        l.lp  = IDemaxDelegate(_delegate).playerPairs(msg.sender, _i);
+        l.pair = IDemaxFactory(factory).getPair(IDemaxLP(l.lp).tokenA(), IDemaxLP(l.lp).tokenB());
+        l.balance = IERC20(l.lp).balanceOf(msg.sender);
+        l.totalSupply = IERC20(l.pair).totalSupply();
+        l.lastBlock = IDemaxPair(l.pair).lastMintBlock(msg.sender);
+        l.delegate = _delegate;
+        return l;
+    }
     
-    function queryLiquidityList() public view returns (Liquidity[] memory liquidity_list) {
-        uint count = IDemaxDelegate(delegate).getPlayerPairCount(msg.sender);
+    function queryLiquidityListByDelegate(address _delegate) public view returns (Liquidity[] memory liquidity_list) {
+        uint count = IDemaxDelegate(_delegate).getPlayerPairCount(msg.sender);
         if(count > 0) {
             liquidity_list = new Liquidity[](count);
             for(uint i = 0;i < count;i++) {
-                Liquidity memory l;
-                l.lp  = IDemaxDelegate(delegate).playerPairs(msg.sender, i);
-                l.pair = IDemaxFactory(factory).getPair(IDemaxLP(l.lp).tokenA(), IDemaxLP(l.lp).tokenB());
-                l.balance = IERC20(l.lp).balanceOf(msg.sender);
-                l.totalSupply = IERC20(l.pair).totalSupply();
-                l.lastBlock = IDemaxPair(l.pair).lastMintBlock(msg.sender);
-                liquidity_list[i] = l;
+                liquidity_list[i] = getLiquidity(_delegate, i);
             }
         }
     }
 
-    function countLiquidityList() public view returns (uint) {
-        return IDemaxDelegate(delegate).getPlayerPairCount(msg.sender);
+    function countLiquidityListByDelegate(address _delegate) public view returns (uint) {
+        return IDemaxDelegate(_delegate).getPlayerPairCount(msg.sender);
     }
         
-    function iterateLiquidityList(uint _start, uint _end) public view returns (Liquidity[] memory liquidity_list) {
+    function iterateLiquidityListByDelegate(address _delegate, uint _start, uint _end) public view returns (Liquidity[] memory liquidity_list) {
         require(_start <= _end && _start >= 0 && _end >= 0, "INVAID_PARAMTERS");
-        uint count = IDemaxDelegate(delegate).getPlayerPairCount(msg.sender);
+        uint count = IDemaxDelegate(_delegate).getPlayerPairCount(msg.sender);
         if(count > 0) {
             if (_end > count) _end = count;
+            if (_start > _end) _start = _end;
             count = _end - _start;
             liquidity_list = new Liquidity[](count);
             uint index = 0;
             for(uint i = 0;i < count;i++) {
-                Liquidity memory l;
-                l.lp  = IDemaxDelegate(delegate).playerPairs(msg.sender, i);
-                l.pair = IDemaxFactory(factory).getPair(IDemaxLP(l.lp).tokenA(), IDemaxLP(l.lp).tokenB());
-                l.balance = IERC20(l.lp).balanceOf(msg.sender);
-                l.totalSupply = IERC20(l.pair).totalSupply();
-                l.lastBlock = IDemaxPair(l.pair).lastMintBlock(msg.sender);
-                liquidity_list[index] = l;
+                liquidity_list[index] = getLiquidity(_delegate, i);
                 index++;
             }
         }
     }
+   
+    function queryLiquidityList() public view returns (Liquidity[] memory liquidity_list) {
+        uint count = IDemaxDelegate(delegate).getPlayerPairCount(msg.sender);
+        uint countDelegate = IDemaxDelegate(delegate).countDelegateHistory();
 
-    function queryPairListInfo(address[] memory pair_list) public view returns (address[] memory token0_list, address[] memory token1_list,
-    uint[] memory reserve0_list, uint[] memory reserve1_list) {
+        for(uint i; i<countDelegate; i++) {
+            address _delegate = IDemaxDelegate(delegate).delegateHistory(i);
+            count += IDemaxDelegate(_delegate).getPlayerPairCount(msg.sender);
+        }
+
+        liquidity_list = new Liquidity[](count);
+        uint index;
+        uint size = IDemaxDelegate(delegate).getPlayerPairCount(msg.sender);
+        if(size > 0) {
+            for(uint i = 0;i < size;i++) {
+                liquidity_list[index] = getLiquidity(delegate, i);
+                index++;
+            }
+        }
+        for(uint i; i<countDelegate; i++) {
+            address _delegate = IDemaxDelegate(delegate).delegateHistory(i);
+            size = IDemaxDelegate(_delegate).getPlayerPairCount(msg.sender);
+            if(size > 0) {
+                for(uint j = 0;j < size;j++) {
+                    liquidity_list[index] = getLiquidity(_delegate, j);
+                    index++;
+                }
+            }
+        }
+        
+        return liquidity_list;
+    }
+
+
+    function queryPairListInfo(address[] memory pair_list) public view returns (address[] memory token0_list, address[] memory token1_list, uint[] memory reserve0_list, uint[] memory reserve1_list) {
         uint count = pair_list.length;
         if(count > 0) {
             token0_list = new address[](count);
@@ -346,12 +392,16 @@ contract DemaxQuery2 {
         }
     }
     
-    function queryTokenItemInfo(address token) public view returns (string memory symbol, uint decimal, uint totalSupply, uint balance, uint allowance) {
+    function queryTokenItemInfoWithSpender(address token, address spender) public view returns (string memory symbol, uint decimal, uint totalSupply, uint balance, uint allowance) {
         symbol = IERC20(token).symbol();
         decimal = IERC20(token).decimals();
         totalSupply = IERC20(token).totalSupply();
         balance = IERC20(token).balanceOf(msg.sender);
-        allowance = IERC20(token).allowance(msg.sender, delegate);
+        allowance = IERC20(token).allowance(msg.sender, spender);
+    }
+  
+    function queryTokenItemInfo(address token) public view returns (string memory symbol, uint decimal, uint totalSupply, uint balance, uint allowance) {
+        (symbol, decimal, totalSupply, balance, allowance) = queryTokenItemInfoWithSpender(token, delegate);
     }
     
     function queryConfigInfo(bytes32 name) public view returns (Config memory config_item){
@@ -381,6 +431,7 @@ contract DemaxQuery2 {
         require(_start <= _end && _start >= 0 && _end >= 0, "INVAID_PARAMTERS");
         uint count = IDemaxGovernance(governance).ballotCount();
         if (_end > count) _end = count;
+        if (_start > _end) _start = _end;
         count = _end - _start;
         proposal_list = new Proposal[](count);
         uint index = 0;
@@ -395,14 +446,17 @@ contract DemaxQuery2 {
         require(_end <= _start && _end >= 0 && _start >= 0, "INVAID_PARAMTERS");
         uint count = IDemaxGovernance(governance).ballotCount();
         if (_start > count) _start = count;
+        if (_end > _start) _end = _start;
         count = _start - _end;
         proposal_list = new Proposal[](count);
         uint index = 0;
-        for(uint i = 0;i < count;i++) {
-            address ballot_address = IDemaxGovernance(governance).ballots(i);
+        for(uint i = _end;i < _start; i++) {
+            uint j = _start - index -1;
+            address ballot_address = IDemaxGovernance(governance).ballots(j);
             proposal_list[index] = generateProposal(ballot_address);
             index++;
         }
+        return proposal_list;
     }
         
     function queryPairWeights(address[] memory pairs) public view returns (uint[] memory weights){

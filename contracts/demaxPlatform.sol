@@ -11,9 +11,11 @@ import './interfaces/IDemaxFactory.sol';
 import './interfaces/IDemaxPair.sol';
 import './interfaces/IDemaxPool.sol';
 import './modules/Ownable.sol';
+import './modules/ReentrancyGuard.sol';
 import './interfaces/IDemaxTransferListener.sol';
+import './interfaces/ITokenRegistry.sol';
 
-contract DemaxPlatform is Ownable {
+contract DemaxPlatform is Ownable, ReentrancyGuard {
     uint256 public version = 1;
     address public DGAS;
     address public CONFIG;
@@ -57,6 +59,11 @@ contract DemaxPlatform is Ownable {
         _;
     }
 
+    modifier noneTokenCall() {
+        require(ITokenRegistry(CONFIG).tokenStatus(msg.sender) == 0, 'DEMAX PLATFORM : ILLEGAL CALL');
+        _;
+    }
+
     function initialize(
         address _DGAS,
         address _CONFIG,
@@ -90,7 +97,7 @@ contract DemaxPlatform is Ownable {
         uint256 amountBDesired,
         uint256 amountAMin,
         uint256 amountBMin
-    ) internal returns (uint256 amountA, uint256 amountB) {
+    ) internal nonReentrant noneTokenCall returns (uint256 amountA, uint256 amountB) {
         if (IDemaxFactory(FACTORY).getPair(tokenA, tokenB) == address(0)) {
             IDemaxConfig(CONFIG).addToken(tokenA);
             IDemaxConfig(CONFIG).addToken(tokenB);
@@ -200,7 +207,7 @@ contract DemaxPlatform is Ownable {
         uint256 amountBMin,
         address to,
         uint256 deadline
-    ) public ensure(deadline) returns (uint256 amountA, uint256 amountB) {
+    ) public ensure(deadline) nonReentrant returns (uint256 amountA, uint256 amountB) {
         require(!isPause, "DEMAX PAUSED");
         address pair = DemaxSwapLibrary.pairFor(FACTORY, tokenA, tokenB);
         uint256 _liquidity = liquidity;
@@ -297,15 +304,30 @@ contract DemaxPlatform is Ownable {
         uint256 limitValue = SafeMath.mul(SafeMath.add(dgasValue, reserveWETH), percent) / PERCENT_DENOMINATOR;
         return dgasValue >= limitValue;
     }
+         
+    function checkPath(address _path, address[] memory _paths) public pure returns (bool) {
+        uint count;
+        for(uint i; i<_paths.length; i++) {
+            if(_paths[i] == _path) {
+                count++;
+            }
+        }
+        if(count == 1) {
+            return true;
+        } else {
+            return false;
+        }
+    }
 
     function _swap(
         uint256[] memory amounts,
         address[] memory path,
         address _to
-    ) internal {
+    ) internal nonReentrant noneTokenCall {
         require(!isPause, "DEMAX PAUSED");
         require(swapPrecondition(path[path.length - 1]), 'DEMAX PLATFORM : CHECK DGAS/TOKEN TO VALUE FAIL');
         for (uint256 i; i < path.length - 1; i++) {
+            require(checkPath(path[i], path) && checkPath(path[i + 1], path), 'DEMAX PLATFORM : INVALID PATH');
             (address input, address output) = (path[i], path[i + 1]);
             require(swapPrecondition(input), 'DEMAX PLATFORM : CHECK DGAS/TOKEN VALUE FROM FAIL');
             require(IDemaxConfig(CONFIG).checkPair(input, output), 'DEMAX PLATFORM : SWAP PAIR CONFIG CHECK FAIL');
@@ -315,7 +337,18 @@ contract DemaxPlatform is Ownable {
                 ? (uint256(0), amountOut)
                 : (amountOut, uint256(0));
             address to = i < path.length - 2 ? DemaxSwapLibrary.pairFor(FACTORY, output, path[i + 2]) : _to;
-            IDemaxPair(DemaxSwapLibrary.pairFor(FACTORY, input, output)).swap(amount0Out, amount1Out, to, new bytes(0));
+
+            // add k check
+            address pair = DemaxSwapLibrary.pairFor(FACTORY, input, output);
+            (uint reserve0, uint resereve1, ) = IDemaxPair(pair).getReserves();
+            uint kBefore = SafeMath.mul(reserve0, resereve1);
+
+            IDemaxPair(pair).swap(amount0Out, amount1Out, to, new bytes(0));
+
+            (reserve0, resereve1, ) = IDemaxPair(pair).getReserves();
+            uint kAfter = SafeMath.mul(reserve0, resereve1);
+            require(kBefore <= kAfter, "Burger K");
+
             if (amount0Out > 0)
                 _transferNotify(DemaxSwapLibrary.pairFor(FACTORY, input, output), to, token0, amount0Out);
             if (amount1Out > 0)
@@ -329,13 +362,12 @@ contract DemaxPlatform is Ownable {
         address[] memory path,
         uint256 percent
     ) internal {
-        address[] memory feepath = new address[](2);
-        feepath[1] = DGAS;
         for (uint256 i = 0; i < path.length - 1; i++) {
             uint256 fee = SafeMath.mul(amounts[i], percent) / PERCENT_DENOMINATOR;
             address input = path[i];
             address output = path[i + 1];
             address currentPair = DemaxSwapLibrary.pairFor(FACTORY, input, output);
+
             if (input == DGAS) {
                 IDemaxPair(currentPair).swapFee(fee, DGAS, POOL);
                 _transferNotify(currentPair, POOL, DGAS, fee);
@@ -348,6 +380,7 @@ contract DemaxPlatform is Ownable {
                 _transferNotify(DemaxSwapLibrary.pairFor(FACTORY, input, DGAS), POOL, DGAS, feeOut);
                 fee = feeOut;
             }
+
             if (fee > 0) IDemaxPool(POOL).addRewardFromPlatform(currentPair, fee);
         }
     }
@@ -438,11 +471,12 @@ contract DemaxPlatform is Ownable {
             SafeMath.mul(amountIn, SafeMath.sub(PERCENT_DENOMINATOR, percent)) / PERCENT_DENOMINATOR
         );
         _swap(amounts, path, address(this));
-        IWETH(WETH).withdraw(amounts[amounts.length - 1]);
-        TransferHelper.safeTransferETH(to, amounts[amounts.length - 1]);
 
         _innerTransferFrom(path[0], msg.sender, pair, SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR);
         _swapFee(amounts, path, percent);
+
+        IWETH(WETH).withdraw(amounts[amounts.length - 1]);
+        TransferHelper.safeTransferETH(to, amounts[amounts.length - 1]);
     }
 
     function swapTokensForExactTokens(

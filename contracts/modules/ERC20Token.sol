@@ -15,7 +15,7 @@ contract ERC20Token {
     event Transfer(address indexed from, address indexed to, uint value);
     event Approval(address indexed owner, address indexed spender, uint value);
 
-    function _transfer(address from, address to, uint value) private {
+    function _transfer(address from, address to, uint value) internal {
         require(balanceOf[from] >= value, 'ERC20Token: INSUFFICIENT_BALANCE');
         balanceOf[from] = balanceOf[from].sub(value);
         balanceOf[to] = balanceOf[to].add(value);

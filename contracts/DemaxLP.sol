@@ -13,6 +13,11 @@ interface IDemaxPair {
     function mintReward() external returns (uint256 userReward);
 }
 
+interface IDemaxDelegate {
+    function getPair(address tokenA, address tokenB) external view returns(address);
+    function addPlayerPair(address _user) external;
+}
+
 interface IDemaxPlatform{
     function addLiquidity(
         address tokenA,
@@ -104,7 +109,9 @@ contract DemaxLP is BaseShareField {
         if (to == address(0)) { // burn
             totalSupply = totalSupply.sub(value);
         }
-        
+
+        IDemaxDelegate(owner).addPlayerPair(to);
+        _mintReward();
         _decreaseProductivity(from, value);
         _increaseProductivity(to, value);
         emit Transfer(from, to, value);
@@ -159,6 +166,21 @@ contract DemaxLP is BaseShareField {
         require(msg.sender == owner, "Demax LP Forbidden");
         PLATFORM = _PLATFORM;
     }
+
+    function approveContract(address token, address spender, uint amount) internal {
+        uint allowAmount = IERC20(token).totalSupply();
+        if(allowAmount < amount) {
+            allowAmount = amount;
+        }
+
+        uint _allowance = IERC20(token).allowance(address(this), spender);
+        if(_allowance < amount) {
+            if(_allowance > 0) {
+                TransferHelper.safeApprove(token, spender, 0); // workaround for usdt approve
+            }
+            TransferHelper.safeApprove(token, spender, allowAmount);
+        }
+    }
     
     function addLiquidityETH(
         address user,
@@ -173,7 +195,7 @@ contract DemaxLP is BaseShareField {
            require(msg.sender == owner, "Demax LP Forbidden");
            require(tokenA == WETH || tokenB == WETH, "INVALID CALL");
            address token = tokenA == WETH ? tokenB: tokenA;
-           TransferHelper.safeApprove(token, PLATFORM, amountTokenDesired);
+           approveContract(token, PLATFORM, amountTokenDesired);
            TransferHelper.safeTransferFrom(token, msg.sender, address(this), amountTokenDesired);
            
            (_amountToken, _amountETH, _liquidity) = IDemaxPlatform(PLATFORM).addLiquidityETH{value: msg.value}(token, amountTokenDesired, amountTokenMin, amountETHMin, deadline);
@@ -204,8 +226,8 @@ contract DemaxLP is BaseShareField {
             uint256 _liquidity
         ) {
             require(msg.sender == owner, "Demax LP Forbidden");
-            TransferHelper.safeApprove(tokenA, PLATFORM, amountA);
-            TransferHelper.safeApprove(tokenB, PLATFORM, amountB);
+            approveContract(tokenA, PLATFORM, amountA);
+            approveContract(tokenB, PLATFORM, amountB);
             TransferHelper.safeTransferFrom(tokenA, msg.sender, address(this), amountA);
             TransferHelper.safeTransferFrom(tokenB, msg.sender, address(this), amountB);
         (_amountA, _amountB, _liquidity) = IDemaxPlatform(PLATFORM).addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, deadline);
