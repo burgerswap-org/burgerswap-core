@@ -44,6 +44,7 @@ interface IDemaxFactory {
 }
 
 interface IDemaxDelegate {
+    function getPair(address tokenA, address tokenB) external view returns(address);
     function getPlayerPairCount(address player) external view returns(uint);
     function playerPairs(address user, uint index) external view returns(address);
     function countDelegateHistory() external view returns(uint);
@@ -169,6 +170,17 @@ contract DemaxQuery2 {
         uint lastBlock;
         address delegate;
     }
+
+    struct LiquidityInfo {
+        address pair;
+        address lp;
+        uint balance;
+        uint totalSupply;
+        uint lastBlock;
+        address delegate;
+        address tokenA;
+        address tokenB;
+    }
     
     constructor() public {
         owner = msg.sender;
@@ -241,11 +253,28 @@ contract DemaxQuery2 {
     }
 
     function getLiquidity(address _delegate, uint _i) public view returns (Liquidity memory l) {
-        l.lp  = IDemaxDelegate(_delegate).playerPairs(msg.sender, _i);
+        address lp = IDemaxDelegate(_delegate).playerPairs(msg.sender, _i);
+        return getLiquidity(_delegate, lp, msg.sender);
+    }
+
+    function getLiquidity(address _delegate, address _lp, address _user) public view returns (Liquidity memory l) {
+        l.lp  = _lp;
         l.pair = IDemaxFactory(factory).getPair(IDemaxLP(l.lp).tokenA(), IDemaxLP(l.lp).tokenB());
-        l.balance = IERC20(l.lp).balanceOf(msg.sender);
+        l.balance = IERC20(l.lp).balanceOf(_user);
         l.totalSupply = IERC20(l.pair).totalSupply();
-        l.lastBlock = IDemaxPair(l.pair).lastMintBlock(msg.sender);
+        l.lastBlock = IDemaxPair(l.pair).lastMintBlock(_user);
+        l.delegate = _delegate;
+        return l;
+    }
+
+    function getLiquidityInfo(address _delegate, address _lp, address _user) public view returns (LiquidityInfo memory l) {
+        l.lp  = _lp;
+        l.tokenA = IDemaxLP(l.lp).tokenA();
+        l.tokenB = IDemaxLP(l.lp).tokenB();
+        l.pair = IDemaxFactory(factory).getPair(l.tokenA, l.tokenB);
+        l.balance = IERC20(l.lp).balanceOf(_user);
+        l.totalSupply = IERC20(l.pair).totalSupply();
+        l.lastBlock = IDemaxPair(l.pair).lastMintBlock(_user);
         l.delegate = _delegate;
         return l;
     }
