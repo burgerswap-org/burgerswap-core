@@ -177,9 +177,12 @@ contract DemaxQuery2 {
         uint balance;
         uint totalSupply;
         uint lastBlock;
+        uint currentBlock;
         address delegate;
-        address tokenA;
-        address tokenB;
+        address token0;
+        address token1;
+        uint reserve0;
+        uint reserve1;
     }
     
     constructor() public {
@@ -267,16 +270,36 @@ contract DemaxQuery2 {
         return l;
     }
 
+    function getLiquidityInfo(address _delegate, uint _i) public view returns (LiquidityInfo memory l) {
+        address lp = IDemaxDelegate(_delegate).playerPairs(msg.sender, _i);
+        return getLiquidityInfo(_delegate, lp, msg.sender);
+    }
+
     function getLiquidityInfo(address _delegate, address _lp, address _user) public view returns (LiquidityInfo memory l) {
         l.lp  = _lp;
-        l.tokenA = IDemaxLP(l.lp).tokenA();
-        l.tokenB = IDemaxLP(l.lp).tokenB();
-        l.pair = IDemaxFactory(factory).getPair(l.tokenA, l.tokenB);
+        l.token0 = IDemaxLP(l.lp).tokenA();
+        l.token1 = IDemaxLP(l.lp).tokenB();
+        l.pair = IDemaxFactory(factory).getPair(l.token0, l.token1);
         l.balance = IERC20(l.lp).balanceOf(_user);
         l.totalSupply = IERC20(l.pair).totalSupply();
         l.lastBlock = IDemaxPair(l.pair).lastMintBlock(_user);
+        l.currentBlock = block.number;
         l.delegate = _delegate;
+
+        (address token0, , , , uint reserve0, uint reserve1) = getPairReserve(l.pair);
+        if(token0 == l.token0) {
+            l.reserve0 = reserve0;
+            l.reserve1 = reserve1;
+        } else {
+            l.reserve0 = reserve1;
+            l.reserve1 = reserve0;
+        }
         return l;
+    }
+
+    function getLiquidityInfoByTokens(address _delegate, address _tokenA, address _tokenB, address _user) public view returns (LiquidityInfo memory l) {
+        address lp = IDemaxDelegate(_delegate).getPair(_tokenA, _tokenB);
+        return getLiquidityInfo(_delegate, lp, _user);
     }
     
     function queryLiquidityListByDelegate(address _delegate) public view returns (Liquidity[] memory liquidity_list) {
@@ -302,8 +325,34 @@ contract DemaxQuery2 {
             count = _end - _start;
             liquidity_list = new Liquidity[](count);
             uint index = 0;
-            for(uint i = 0;i < count;i++) {
+            for(uint i = _start;i < _end;i++) {
                 liquidity_list[index] = getLiquidity(_delegate, i);
+                index++;
+            }
+        }
+    }
+
+    function queryLiquidityInfoListByDelegate(address _delegate) public view returns (LiquidityInfo[] memory liquidity_list) {
+        uint count = IDemaxDelegate(_delegate).getPlayerPairCount(msg.sender);
+        if(count > 0) {
+            liquidity_list = new LiquidityInfo[](count);
+            for(uint i = 0;i < count;i++) {
+                liquidity_list[i] = getLiquidityInfo(_delegate, i);
+            }
+        }
+    }
+    
+    function iterateLiquidityInfoListByDelegate(address _delegate, uint _start, uint _end) public view returns (LiquidityInfo[] memory liquidity_list) {
+        require(_start <= _end && _start >= 0 && _end >= 0, "INVAID_PARAMTERS");
+        uint count = IDemaxDelegate(_delegate).getPlayerPairCount(msg.sender);
+        if(count > 0) {
+            if (_end > count) _end = count;
+            if (_start > _end) _start = _end;
+            count = _end - _start;
+            liquidity_list = new LiquidityInfo[](count);
+            uint index = 0;
+            for(uint i = _start;i < _end;i++) {
+                liquidity_list[index] = getLiquidityInfo(_delegate, i);
                 index++;
             }
         }
@@ -464,7 +513,7 @@ contract DemaxQuery2 {
         count = _end - _start;
         proposal_list = new Proposal[](count);
         uint index = 0;
-        for(uint i = 0;i < count;i++) {
+        for(uint i = _start;i < _end;i++) {
             address ballot_address = IDemaxGovernance(governance).ballots(i);
             proposal_list[index] = generateProposal(ballot_address);
             index++;
@@ -494,6 +543,11 @@ contract DemaxQuery2 {
         for(uint i = 0; i < count; i++) {
             weights[i] = IDemaxTransferListener(transferListener).pairWeights(pairs[i]);
         }
+    }
+
+    function getPairReserveByTokens(address _tokenA, address _tokenB) public view returns (address token0, address token1, uint8 decimals0, uint8 decimals1, uint reserve0, uint reserve1) {
+        address pair = IDemaxFactory(factory).getPair(_tokenA, _tokenB);
+        return getPairReserve(pair);
     }
 
     function getPairReserve(address _pair) public view returns (address token0, address token1, uint8 decimals0, uint8 decimals1, uint reserve0, uint reserve1) {
