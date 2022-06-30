@@ -42,11 +42,11 @@ describe('DemaxConfig', () => {
 
   const [wallet, governor, rewarder, dev, user1, user2] = provider.getWallets()
 
-  let demaxConfig: Contract
-  let dgas: Contract
-  let tokenA: Contract
-  let tokenB: Contract
-  let tokenC: Contract
+  let demaxConfig: any
+  let dgas: any
+  let tokenA: any
+  let tokenB: any
+  let tokenC: any
   before(async () => {
     const balance = await wallet.getBalance();
     log.debug('wallet:', wallet.address, ' balance:', expandToString(balance))

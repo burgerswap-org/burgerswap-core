@@ -23,6 +23,8 @@ describe('Util', () => {
     console.log('1ETH:', expandTo18Decimals(1).toString())
     console.log('0.05ETH:', parseEther('0.05').toString())
     console.log('1e28:', new BigNumber(10).pow(28).toString())
+    
+    console.log('24604.54482ETH:', parseEther('24604.54482').toString())
   })
 
   it('decrease', async () => {

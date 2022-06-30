@@ -14,9 +14,10 @@ import {
 import { LogConsole as log } from './shared/logconsol'
 import demaxPlatform from '../build/demaxPlatform.json'
 import ERC20 from '../build/ERC20.json'
-import dgas from '../build/Dgas.json'
+import dgas from '../build/DgasTest.json'
 import demaxConfig from '../build/DemaxConfigTest.json'
 import demaxPair from '../build/DemaxPair.json'
+import demaxPool from '../build/DemaxPool.json'
 import WETH9 from '../build/WETH9.json'
 import usdt from '../build/usdt.json'
 import demaxFactory from '../build/DemaxFactory.json'
@@ -36,19 +37,20 @@ const overrides = {
   gasPrice: 10 ** 10 // 10gwei
 }
 
-let WETH: Contract
-let CONFIG: Contract
-let FACTORY: Contract
-let PLATFORM: Contract
-let PLATFORM2: Contract
-let DGAS: Contract
-let TOKEN_A: Contract
-let TOKEN_B: Contract
-let TOKEN_USDT: Contract
-let GOVERNANCE: Contract
-let BALLOT_FACTORY: Contract
-let TRANSFER_LISTENER: Contract
-let TRANSFER_LISTENER2: Contract
+let WETH: any
+let CONFIG: any
+let FACTORY: any
+let PLATFORM: any
+let PLATFORM2: any
+let POOL: any
+let DGAS: any
+let TOKEN_A: any
+let TOKEN_B: any
+let TOKEN_USDT: any
+let GOVERNANCE: any
+let BALLOT_FACTORY: any
+let TRANSFER_LISTENER: any
+let TRANSFER_LISTENER2: any
 let userAccount: string
 let wallet: any
 let dev: any
@@ -91,8 +93,9 @@ async function makeContractAndInitialize() {
   TRANSFER_LISTENER = await deployContract(wallet, demaxTransferListener, [], overrides)
   TRANSFER_LISTENER2 = await deployContract(wallet, demaxTransferListener, [], overrides)
   FACTORY = await deployContract(wallet, demaxFactory, [DGAS.address, CONFIG.address], overrides)
+  POOL = await deployContract(wallet, demaxPool, [], overrides)
 
-  await TRANSFER_LISTENER.initialize(DGAS.address, FACTORY.address, WETH.address, PLATFORM.address)
+  await TRANSFER_LISTENER.initialize(DGAS.address, FACTORY.address, WETH.address, PLATFORM.address, dev)
   await GOVERNANCE.initialize(PLATFORM.address, CONFIG.address, BALLOT_FACTORY.address)
   await PLATFORM.initialize(
     DGAS.address,
@@ -100,16 +103,25 @@ async function makeContractAndInitialize() {
     FACTORY.address,
     WETH.address,
     GOVERNANCE.address,
-    TRANSFER_LISTENER.address
+    TRANSFER_LISTENER.address,
+    POOL.address
   )
+
+  await POOL.initialize(
+    DGAS.address,
+    WETH.address,
+    FACTORY.address,
+    PLATFORM.address,
+    CONFIG.address,
+    GOVERNANCE.address
+  )
+
   await CONFIG.initialize(DGAS.address, GOVERNANCE.address, PLATFORM.address, dev, [
     DGAS.address,
     WETH.address,
     TOKEN_USDT.address,
   ])
   await DGAS.upgradeImpl(TRANSFER_LISTENER.address)
-
-  await TRANSFER_LISTENER.setWhitelist(true, [DGAS.address, WETH.address, TOKEN_A.address, TOKEN_B.address, TOKEN_USDT.address])
 
   log.debug('initialize end')
 }
@@ -138,9 +150,13 @@ async function getDGAS() {
   let receipt = await tx.wait()
   await runBlock(400)
   const pairContract = await getPairContract(TOKEN_USDT.address, WETH.address)
-  tx = await pairContract.mintReward() // mint dgas for pair
-  receipt = await tx.wait()
-  log.debug('mintReward gas:', receipt.gasUsed.toString())
+  const _reward = await  pairContract.queryReward()
+  if(_reward > 0) {
+    tx = await pairContract.mintReward() // mint dgas for pair
+    receipt = await tx.wait()
+    log.debug('mintReward gas:', receipt.gasUsed.toString())
+  }
+  
   log.debug(
     'add liquidity  usdt/eth after 20 block get dgas amount : ',
     convertBigNumber(await DGAS.balanceOf(wallet.address))
@@ -169,6 +185,12 @@ async function listTokens(address: string) {
   // // comfirm vote result
   await GOVERNANCE.auditListToken(ballotAddress)
 }
+
+async function changeSwapFee(value:any) {
+  let tx = await CONFIG.changeConfigValueNoCheck(formatBytes32String('SWAP_FEE_PERCENT'), value)
+  await tx.wait()
+}
+
 
 async function runBlock(count = 5) {
   for (let i = 0; i < count; i++) {
@@ -200,7 +222,7 @@ describe('upgrade platform and listener contract ', async () => {
   })
   it('execute update contract', async () => {
     await CONFIG.initialize(DGAS.address, GOVERNANCE.address, PLATFORM2.address, dev, [])
-    await TRANSFER_LISTENER2.initialize(DGAS.address, FACTORY.address, WETH.address, PLATFORM2.address)
+    await TRANSFER_LISTENER2.initialize(DGAS.address, FACTORY.address, WETH.address, PLATFORM2.address, dev)
     await TRANSFER_LISTENER.updateDGASImpl(TRANSFER_LISTENER2.address)
     await PLATFORM2.initialize(
       DGAS.address,
@@ -208,7 +230,16 @@ describe('upgrade platform and listener contract ', async () => {
       FACTORY.address,
       WETH.address,
       GOVERNANCE.address,
-      TRANSFER_LISTENER2.address
+      TRANSFER_LISTENER2.address,
+      POOL.address
+    )
+    await POOL.initialize(
+      DGAS.address,
+      WETH.address,
+      FACTORY.address,
+      PLATFORM2.address,
+      CONFIG.address,
+      GOVERNANCE.address
     )
   })
   it('after update add dgas/eth liquilidty', async () => {
@@ -480,11 +511,11 @@ describe('removeLiqulity', async () => {
     let tx = await PLATFORM.removeLiquidity(
       TOKEN_A.address,
       TOKEN_B.address,
-      liquidity.div(2),
+      liquidity,
       expandTo18Decimals(1),
       expandTo18Decimals(1),
       userAccount,
-      Math.trunc(Date.now() / 1000) + 100
+      Math.trunc(Date.now() / 1000) + 1000
     )
     let receipt = await tx.wait()
     log.debug('removeLiquidity gas:', receipt.gasUsed.toString())

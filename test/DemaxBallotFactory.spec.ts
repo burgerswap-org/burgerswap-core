@@ -36,9 +36,9 @@ describe('DemaxBallotFactory', () => {
   
   const [wallet, user1, user2] = provider.getWallets()
 
-  let dgas: Contract
-  let demaxBallot: Contract
-  let demaxBallotFactory: Contract
+  let dgas: any
+  let demaxBallot: any
+  let demaxBallotFactory: any
   before(async () => {
     const balance = await wallet.getBalance();
     log.debug('wallet:', wallet.address, ' balance:', expandToString(balance))

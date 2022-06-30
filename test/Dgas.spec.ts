@@ -31,10 +31,10 @@ describe('Dgas', () => {
   
   const [wallet, user1, user2] = provider.getWallets()
 
-  let token: Contract
+  let token: any
   let lastBlockNumber: any
   before(async () => {
-    const balance = await wallet.getBalance();
+    const balance:any = await wallet.getBalance();
     log.debug('wallet:', wallet.address, ' balance:', expandToString(balance))
     token = await deployContract(wallet, Dgas, [], overrides)
     // log.debug('token:', token)

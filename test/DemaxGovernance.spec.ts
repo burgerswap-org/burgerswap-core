@@ -45,17 +45,17 @@ describe('DemaxGovernance', () => {
   
   const [wallet, rewarder, dev, user1, user2] = provider.getWallets()
 
-  let dgas: Contract
-  let weth: Contract
-  let demaxConfig: Contract
-  let demaxGovernance: Contract
-  let demaxBallot: Contract
-  let demaxBallotFactory: Contract
-  let tokenA: Contract
-  let tokenB: Contract
-  let tokenC: Contract
-  let tokenD: Contract
-  let tokenE: Contract
+  let dgas: any
+  let weth: any
+  let demaxConfig: any
+  let demaxGovernance: any
+  let demaxBallot: any
+  let demaxBallotFactory: any
+  let tokenA: any
+  let tokenB: any
+  let tokenC: any
+  let tokenD: any
+  let tokenE: any
   let lastBlockNumber: any
   before(async () => {
     const balance = await wallet.getBalance();

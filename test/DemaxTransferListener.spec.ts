@@ -33,9 +33,9 @@ describe('DemaxTransferListener', () => {
   }
   
   const [wallet, plateform, factory, weth, user1] = provider.getWallets()
-  let dgas: Contract
-  let demaxTransferListener: Contract
-  let demaxTransferListener2: Contract
+  let dgas: any
+  let demaxTransferListener: any
+  let demaxTransferListener2: any
   before(async () => {
     const balance = await wallet.getBalance();
     log.debug('wallet:', wallet.address, ' balance:', expandToString(balance))

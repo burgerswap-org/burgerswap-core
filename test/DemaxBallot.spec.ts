@@ -35,8 +35,8 @@ describe('DemaxBallot', () => {
   
   const [wallet, governor, user1, user2, user3, user4] = provider.getWallets()
 
-  let token: Contract
-  let demaxBallot: Contract
+  let token: any
+  let demaxBallot: any
   let expectValue = 1
   let endBlockNumber = 12
   before(async () => {
