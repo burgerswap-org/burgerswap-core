@@ -362,6 +362,7 @@ contract DemaxPlatform is Ownable, ReentrancyGuard {
         address[] memory path,
         uint256 percent
     ) internal {
+        if(percent == 0) return;
         for (uint256 i = 0; i < path.length - 1; i++) {
             uint256 fee = SafeMath.mul(amounts[i], percent) / PERCENT_DENOMINATOR;
             address input = path[i];
@@ -408,8 +409,11 @@ contract DemaxPlatform is Ownable, ReentrancyGuard {
             SafeMath.mul(amountIn, SafeMath.sub(PERCENT_DENOMINATOR, percent)) / PERCENT_DENOMINATOR
         );
         _swap(amounts, path, to);
-        _innerTransferFrom(path[0], msg.sender, pair, SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR);
-        _swapFee(amounts, path, percent);
+        
+        if(percent > 0) {
+            _innerTransferFrom(path[0], msg.sender, pair, SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR);
+            _swapFee(amounts, path, percent);
+        }
     }
 
     function _innerTransferFrom(
@@ -447,9 +451,11 @@ contract DemaxPlatform is Ownable, ReentrancyGuard {
         );
         _swap(amounts, path, to);
 
-        IWETH(WETH).deposit{value: SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR}();
-        _innerTransferWETH(pair, SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR);
-        _swapFee(amounts, path, percent);
+        if(percent > 0) {
+            IWETH(WETH).deposit{value: SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR}();
+            _innerTransferWETH(pair, SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR);
+            _swapFee(amounts, path, percent);
+        }
     }
 
     function swapExactTokensForETH(
@@ -472,8 +478,10 @@ contract DemaxPlatform is Ownable, ReentrancyGuard {
         );
         _swap(amounts, path, address(this));
 
-        _innerTransferFrom(path[0], msg.sender, pair, SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR);
-        _swapFee(amounts, path, percent);
+        if(percent > 0) {
+            _innerTransferFrom(path[0], msg.sender, pair, SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR);
+            _swapFee(amounts, path, percent);
+        }
 
         IWETH(WETH).withdraw(amounts[amounts.length - 1]);
         TransferHelper.safeTransferETH(to, amounts[amounts.length - 1]);
@@ -498,8 +506,11 @@ contract DemaxPlatform is Ownable, ReentrancyGuard {
             SafeMath.mul(amounts[0], SafeMath.sub(PERCENT_DENOMINATOR, percent)) / PERCENT_DENOMINATOR
         );
         _swap(amounts, path, to);
-        _innerTransferFrom(path[0], msg.sender, pair, SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR);
-        _swapFee(amounts, path, percent);
+
+        if(percent > 0) {
+            _innerTransferFrom(path[0], msg.sender, pair, SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR);
+            _swapFee(amounts, path, percent);
+        }
     }
 
     function swapTokensForExactETH(
@@ -524,8 +535,10 @@ contract DemaxPlatform is Ownable, ReentrancyGuard {
         IWETH(WETH).withdraw(amounts[amounts.length - 1]);
         TransferHelper.safeTransferETH(to, amounts[amounts.length - 1]);
 
-        _innerTransferFrom(path[0], msg.sender, pair, SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR);
-        _swapFee(amounts, path, percent);
+        if(percent > 0) {
+            _innerTransferFrom(path[0], msg.sender, pair, SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR);
+            _swapFee(amounts, path, percent);
+        }
     }
 
     function swapETHForExactTokens(
@@ -549,9 +562,12 @@ contract DemaxPlatform is Ownable, ReentrancyGuard {
         );
         _swap(amounts, path, to);
 
-        IWETH(WETH).deposit{value: SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR}();
-        _innerTransferWETH(pair, SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR);
-        _swapFee(amounts, path, percent);
+        if(percent > 0) {
+            IWETH(WETH).deposit{value: SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR}();
+            _innerTransferWETH(pair, SafeMath.mul(amounts[0], percent) / PERCENT_DENOMINATOR);
+            _swapFee(amounts, path, percent);
+        }
+
         if (msg.value > amounts[0]) TransferHelper.safeTransferETH(msg.sender, msg.value - amounts[0]);
     }
 
