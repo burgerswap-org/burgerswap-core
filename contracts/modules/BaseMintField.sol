@@ -31,7 +31,7 @@ contract BaseMintField {
     // compute productivity returns total productivity of a user.
     function _computeProductivity(Productivity memory user) private view returns (uint) {
         uint blocks = block.number.sub(user.block);
-        return user.product = user.product.add(user.total.mul(blocks));
+        return user.product.add(user.total.mul(blocks));
     }
 
     // update users' productivity by value with boolean value indicating increase  or decrease.
