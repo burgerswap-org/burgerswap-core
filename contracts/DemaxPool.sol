@@ -157,7 +157,7 @@ contract DemaxPool is Ownable {
             path[1] = WETH; 
             IDemaxPlatform(PLATFORM).swapExactTokensForETH(amount, 0, path, msg.sender, block.timestamp + 1);
         } else {
-            require(IDemaxFactory(FACTORY).getPair(WETH, DGAS) != address(0), "DEMAX POOL: INVALID PAIR");
+            require(IDemaxFactory(FACTORY).getPair(_rewardToken, DGAS) != address(0), "DEMAX POOL: INVALID PAIR");
             IDgas(DGAS).approve(PLATFORM, amount);
             address[] memory path = new address[](2);
             path[0] = DGAS;
