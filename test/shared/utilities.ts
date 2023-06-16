@@ -1,41 +1,38 @@
 import { Contract } from 'ethers'
-import { Web3Provider } from 'ethers/providers'
+import { ethers, BigNumber } from 'ethers'
 import { BigNumber as BN } from 'bignumber.js'
 import {
-  BigNumber,
-  bigNumberify,
   getAddress,
   keccak256,
   defaultAbiCoder,
   toUtf8Bytes,
   solidityPack
-} from 'ethers/utils'
+} from 'ethers/lib/utils'
 
-export const MINIMUM_LIQUIDITY = bigNumberify(10).pow(3)
+const Web3Provider = ethers.providers;
+
+export const MINIMUM_LIQUIDITY = BigNumber.from(10).pow(3)
 
 const PERMIT_TYPEHASH = keccak256(
   toUtf8Bytes('Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)')
 )
 
 export function expandTo18Decimals(n: number,p = 18): BigNumber {
-  return bigNumberify(n).mul(bigNumberify(10).pow(p))
+  return BigNumber.from(n).mul(BigNumber.from(10).pow(p))
 }
 
-export const sleep = (ms: number) =>
-  new Promise(resolve =>
-    setTimeout(() => {
-      resolve()
-    }, ms)
-  )
+export function sleep(ms:number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 export function expandToNumber(bnAmount: BigNumber, precision = 18) {
-  let bnPrecision = new BigNumber(10).pow(precision)
+  let bnPrecision = BigNumber.from(10).pow(precision)
   bnAmount = bnAmount.div(bnPrecision)
   return bnAmount
 }
 
 export function expandToString(bnAmount: BigNumber, precision = 18) {
-  let bnPrecision = new BigNumber(10).pow(precision)
+  let bnPrecision = BigNumber.from(10).pow(precision)
   bnAmount = bnAmount.div(bnPrecision)
   return bnAmount.toString()
 }
@@ -45,7 +42,7 @@ export function convertBigNumber(bnAmount: BigNumber) {
 }
 
 export function newBigNumber(val: any) {
-  return new BigNumber(val)
+  return BigNumber.from(val)
 }
 
 function getDomainSeparator(name: string, tokenAddress: string) {
@@ -109,7 +106,7 @@ export async function getApprovalDigest(
   )
 }
 
-export async function mineBlock(provider: Web3Provider, timestamp: number): Promise<void> {
+export async function mineBlock(provider: any, timestamp: number): Promise<void> {
   await new Promise(async (resolve, reject) => {
     ;(provider._web3Provider.sendAsync as any)(
       { jsonrpc: '2.0', method: 'evm_mine', params: [timestamp] },
@@ -125,5 +122,5 @@ export async function mineBlock(provider: Web3Provider, timestamp: number): Prom
 }
 
 export function encodePrice(reserve0: BigNumber, reserve1: BigNumber) {
-  return [reserve1.mul(bigNumberify(2).pow(112)).div(reserve0), reserve0.mul(bigNumberify(2).pow(112)).div(reserve1)]
+  return [reserve1.mul(BigNumber.from(2).pow(112)).div(reserve0), reserve0.mul(BigNumber.from(2).pow(112)).div(reserve1)]
 }

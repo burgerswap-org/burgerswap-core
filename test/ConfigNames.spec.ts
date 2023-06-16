@@ -1,8 +1,9 @@
 import { expect } from 'chai'
-import { formatBytes32String } from 'ethers/utils'
+import { ethers } from 'ethers'
 import { expandTo18Decimals, expandToString, newBigNumber } from './shared/utilities'
 import { LogConsole as log } from './shared/logconsol'
 
+const formatBytes32String = ethers.utils.formatBytes32String
 describe('ConfigNames', () => {
 
   beforeEach(async () => {
